@@ -9,7 +9,7 @@
 
 **Iteration protocol:** (1) read this file → (2) do the **NEXT TASK** → (3) verify (build / test / preview) → (4) commit + push — ALWAYS strip the auto-injected `geobridge` dep from package.json first (atomic strip+commit) → (5) check off the task + set a new NEXT TASK → (6) continue.
 
-**▶ NEXT TASK:** Polish live-data UX: (a) mobile-QA the new whale-source bar (horizontal scroll on 375px — verify usable + not cramped), (b) clearer load feedback for the ~10s fetch (spinner / disable, maybe a timeout), (c) curate 2-3 swing-trader featured whales (high ROI + lower volume = discrete directional trades, not HFT) so races are compelling. THEN ranked mode (daily challenge freeze + scoring fns + leaderboard).
+**▶ NEXT TASK:** **RANKED MODE** (the daily Wordle-style challenge). Steps: (1) a freeze job picks a curated race + snapshots candles + whale trades into Supabase (tables exist) as the day's `challenge`, status='live'; (2) Netlify function `submit-attempt` (service-role, server-authoritative: order intents → replay tick → recompute PnL from frozen data); (3) leaderboard UI via `get_leaderboard` RPC + `get_active_challenge`. Codex the freeze-job + scoring details first (schema-adjacent). ALSO quick: verify the whale-source bar's paste input is reachable on mobile (375px) with 2 featured races.
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
@@ -64,7 +64,7 @@ global leaderboard, plus unranked free-play.
 - [x] Replay engine unit tests — 7 passing (PnL long/short, liquidation, close-realization, determinism, whale curve)
 - [x] Chart renders + deterministic replay playback (lightweight-charts) — verified live, 0 console errors
 - [x] Free-play GAME wired + verified live: paper trade (long/short/close + size/lev), whale ghost markers, dual racing equity curves, live you-vs-whale PnL, result overlay
-- [x] **Live Hyperliquid data** — `challenge.ts` builds a challenge from any wallet's dominant-coin fills (paste-wallet + 3 featured whales + sample toggle), normalized equity race (% on peak notional → $10k). Verified live racing a real ETH whale. Caveat: top-PnL whales are HFT (short/flat races, ~10s load) → curate swing whales next.
+- [x] **Live Hyperliquid data** — race real whales (paste-wallet + 2 curated swing-trader races + sample), normalized equity race. **Curated races** via codex's leaderboard filter (BTC swing = real short-the-top, ~$32k). **Adaptive** candle interval (1h for multi-day) + replay speed (bounds any window to ~60s). Loading overlay. Verified live racing a real BTC short.
 - [ ] Chart + whale ghost markers
 - [ ] Paper execution (long/short, size, leverage, fees/slippage)
 - [ ] Dual live equity curves (you vs whale)
