@@ -154,10 +154,10 @@ export default function App() {
             Beat the Whale
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-2.5 font-mono text-[11px] tabular-nums sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2.5 text-[11px] sm:gap-4">
           <Pnl label="you" value={youPnl} className="text-racer-you" />
           <Pnl label="whale" value={whalePnl} className="text-racer-whale" />
-          <span className="text-ink-muted">
+          <span className="font-mono tabular-nums text-ink-muted">
             {String(tick).padStart(3, '0')}/{tickCount}
           </span>
         </div>
@@ -297,7 +297,7 @@ function Pnl({ label, value, className }: { label: string; value: number; classN
   return (
     <span className="flex items-center gap-1">
       <span className="text-ink-muted">{label}</span>
-      <span className={className}>
+      <span className={`font-mono tabular-nums ${className}`}>
         {sign}${Math.abs(value).toFixed(0)}
       </span>
     </span>
@@ -347,14 +347,18 @@ function Stepper({
 
 function StartHint() {
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-6 text-center">
-      <span className="text-4xl">🐋</span>
-      <span className="font-display text-lg font-bold text-ink">Race the whale&apos;s trades</span>
-      <span className="max-w-xs font-mono text-[11px] leading-relaxed text-ink-secondary">
-        The market replays from the start. Go long or short and beat the whale&apos;s PnL by the end.
+    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg/75 px-8 text-center backdrop-blur-[2px]">
+      <span className="text-5xl">🐋</span>
+      <span className="font-display text-xl font-bold tracking-tight text-ink">
+        Out-trade the whale
       </span>
-      <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-primary">
-        ▶ press play
+      <p className="max-w-[18rem] text-[13px] leading-relaxed text-ink-secondary">
+        A real trader&apos;s moves replay on this chart. Go long or short with paper money and beat
+        their PnL by the end — their actual trades appear as{' '}
+        <span className="font-semibold text-racer-whale">amber markers</span>.
+      </p>
+      <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-primary-muted bg-primary-muted/30 px-3.5 py-1.5 text-xs font-semibold text-primary">
+        ▶ Press play to start
       </span>
     </div>
   )
