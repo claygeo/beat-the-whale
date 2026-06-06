@@ -7,6 +7,7 @@ import { simulate, whaleCurve, type GhostTrade, type OrderIntent } from './lib/r
 import { buildChallengeFromWallet, FEATURED_WHALES, type Challenge } from './lib/challenge'
 import {
   SCENARIOS,
+  STREAM_DT,
   createPath,
   injectEvent,
   pathToCandles,
@@ -198,9 +199,18 @@ export default function App() {
     resetGame()
   }
 
-  // replay shows the whale's real trades as ghost markers; arcade has no opponent trades (passive index)
+  // replay: the whale's real trades as ghost markers · arcade: the player's injected events, so you
+  // can see exactly where your ⚡/🚀 hit the tape (revealed as the replay reaches them)
   const markers: WhaleMarker[] = isScenario
-    ? []
+    ? (scenarioPath?.events ?? [])
+        .map((ev) => ({ ev, ci: Math.min(tickCount, Math.round(ev.triggerIndex / (SCENARIO_CANDLE_MS / STREAM_DT))) }))
+        .filter(({ ci }) => ci <= tick && scenarioCandles[ci])
+        .map(({ ev, ci }) => ({
+          time: Math.floor(scenarioCandles[ci].t / 1000),
+          aboveBar: ev.magnitude < 0,
+          up: ev.magnitude > 0,
+          text: SCENARIOS[ev.key].emoji,
+        }))
     : active.ghost
         .filter((g) => g.tickIndex <= tick)
         .map((g) => ({
