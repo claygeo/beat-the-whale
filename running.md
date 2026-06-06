@@ -28,11 +28,16 @@
 ✅ **README refreshed** → proper portfolio piece (both modes + the interesting engineering: webview-safe deterministic replay, mark-to-market opponent curves, procedural market engine, fair event-free-index opponent, no-secret Postgres backend).
 ✅ **Final functional smoke test DONE (live, 0 console errors):** Whale **Daily → play → RankedResult** (handle input + Submit) verified intact after the mode-toggle refactor (didn't submit — preserved the daily attempt); daily whale curve loads mark-to-market (−$12 → ramps to final). Whale featured/sample/wallet + arcade events/speed/high-score all verified across the session. **Both modes ship-ready.**
 **⚠️ CONTENT FLAG (not a bug):** the seeded Daily whale ends at **+$3,769 (+37.7%)** — a near-unwinnable target. The path works; the *difficulty* is curation. Fix = re-seed the daily with a more beatable whale (modest +5–15% gain) via `scripts/seed-challenge.ts`, and when the daily rotation (pg_cron) lands, curate for beatable targets.
-**NEXT:**
-1. **Re-seed the Daily** with a beatable whale (+5–15%) so the competitive hook is winnable (use the leaderboard-filter curation + a modest-PnL whale; re-run `scripts/seed-challenge.ts` → MCP).
-2. Launch asset: **X post copy** (dr=draftable now) + 10s screen-rec GIF of an Arcade crash→pump→win (**operator action** — needs screen recording).
-3. Stretch: mid-run speed (accumulator clock), live-updating forming candle.
-Deferred: share-card OG image, full in-DB PnL recompute, pg_cron daily freeze.
+✅ **Daily RE-SEEDED beatable (live in prod):** scanned the HL leaderboard (37,913 rows → 1,068 modest performers → tested 28) and found a beatable HYPE short-the-top: `0xd2147a…` = **+$913 (+9.1%)** vs the old +37.7%. Seeded via `scripts/seed-challenge.ts` → Supabase MCP (replaces current_date challenge); verified live — daily loads, whale ramps 0→268→913 mark-to-market, RankedResult shows. Prod site reads same Supabase so no redeploy needed.
+✅ **X launch copy DRAFTED** → `docs/LAUNCH.md` (Option A single tweet + Option B engineering thread for client-attraction; best-GIF note).
+
+## 🟢 CORE MISSION COMPLETE
+The operator's redirect is fully delivered: **taste overhaul** (Inter, decluttered, clear, premium, mobile/iOS-first, fun) + **Scenario/Arcade mechanics** (RNG crash/pump events, speed mode, high-TPS synthetic stream, kept separate from whale-replay). Both modes LIVE + polished + balanced + codex-reviewed + hardened + tested (27). Daily beatable. README + launch copy done. **14 commits: 0b88f32→(this).**
+
+**REMAINING = optional / operator-action only:**
+1. **Operator:** play Arcade live + gut-check difficulty *feel*; record the 10s launch GIF; post (docs/LAUNCH.md).
+2. **Stretch (nice-to-have):** mid-run speed change (smooth accumulator clock — adds clock complexity, weigh vs payoff); live-updating forming candle for extra high-TPS shimmer.
+3. **Deferred infra:** share-card OG image; full in-DB PnL recompute (vs trusting client PnL); pg_cron daily rotation (auto-curate a beatable whale each day instead of manual re-seed).
 **Preview note:** server id `39aa1fc9-…` (port 5202). If the renderer goes flaky / console shows stale `?t=` HMR errors → `preview_stop` (EXACT id from `preview_list`) + `preview_start` for a fresh one. `footer button` clicks don't register the React handler — start/trade via `preview_eval` (find button by textContent).
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
