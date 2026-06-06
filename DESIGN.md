@@ -13,12 +13,13 @@
 - Dark only. Restraint everywhere except the live race, which is allowed to glow.
 - Decoration is the motion of real data, not ornament. No gradients in chrome, no neon on UI.
 
-## Typography
-- **Display/Hero:** Plus Jakarta Sans (600/700), tracking-tight.
-- **Body:** Geist (400/500).
-- **Data / labels / numbers:** Geist Mono with `tabular-nums` — ALL PnL, prices, sizes, %s, timers,
-  leaderboard ranks. Monospaced alignment is non-negotiable for financial data.
-- **Labels:** Geist Mono, 11px, uppercase, 0.1em tracking, ink-secondary.
+## Typography  *(operator-approved override 2026-06-06: "use the same font we have in this chat" → Inter)*
+- **All text (display, body, labels, buttons):** **Inter** (400–800), tracking-tight on headings. Clean,
+  friendly, premium — not the old terminal-mono look that read "AI-built".
+- **Numbers ONLY:** Geist Mono with `tabular-nums` — ALL PnL, prices, sizes, %s, timers, ranks,
+  tick counts. Monospaced alignment is non-negotiable for financial data; mono is reserved for
+  digits, never for prose/labels.
+- **Section labels:** Inter 10–11px, uppercase, wide tracking, ink-muted (sparingly).
 
 ## Color (tokens in `tailwind.config.js`)
 - bg `#07070e` · surface `#0d0d16` / hover `#12121e` · line `#1a1a2a` / hover `#2a2a3a`
@@ -52,3 +53,5 @@
 |------|----------|-----------|
 | 2026-06-06 | Inherit GeoBridge system | Same dark crypto-financial register, proven taste. Swap "3D scene is star" → "live race is star". |
 | 2026-06-06 | Racers: ice-blue (you) vs amber (whale) | Max contrast on dark chart; keeps green/red exclusively for PnL sign. |
+| 2026-06-06 | **Typography → Inter for text, Geist Mono for numbers only** (operator override) | Old terminal-mono everything read "AI-built / off-putting". Inter = the clean Claude-chat sans the operator asked for; mono kept strictly for financial digits. |
+| 2026-06-06 | **Two modes:** 🐋 Whale Race (real recorded whale) + 🎮 Arcade (synthetic market, RNG crash/pump events, passive 📊 Market index opponent) | Arcade = the engineering showpiece + replay value; opponent is a beatable rising benchmark so the player's event-manipulation is the skill. |

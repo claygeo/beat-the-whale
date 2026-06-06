@@ -244,34 +244,23 @@ export default function App() {
         </div>
       </header>
 
-      {/* selector row — replay: pick an opponent · arcade: inject events + speed */}
+      {/* selector row — replay: pick an opponent · arcade: inject events (all 4 visible, no scroll) */}
       {isScenario ? (
-        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto border-y border-line px-3 py-2">
+        <div className="grid grid-cols-4 gap-1.5 border-y border-line px-3 py-2">
           {Object.values(SCENARIOS).map((s) => (
             <button
               key={s.key}
               onClick={() => injectScenario(s.key)}
               disabled={!running || done}
-              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-all active:scale-95 disabled:opacity-40 ${
+              title={running ? `Inject a ${s.label.toLowerCase()}` : 'Press play first'}
+              className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-[11px] font-semibold leading-tight ring-1 ring-inset transition-all active:scale-95 disabled:opacity-40 ${
                 s.dir < 0
                   ? 'text-down ring-down/30 hover:bg-down/10'
                   : 'text-up ring-up/30 hover:bg-up/10'
               }`}
             >
-              {s.emoji} {s.label}
-            </button>
-          ))}
-          <span className="mx-0.5 h-4 w-px shrink-0 bg-line" />
-          {[1, 2, 4].map((sp) => (
-            <button
-              key={sp}
-              onClick={() => setSpeed(sp)}
-              disabled={running}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset transition-all active:scale-95 disabled:opacity-40 ${
-                speed === sp ? 'bg-primary/15 text-primary ring-primary/40' : 'text-ink-secondary ring-line hover:text-ink'
-              }`}
-            >
-              {sp}×
+              <span className="text-base leading-none">{s.emoji}</span>
+              <span className="text-center">{s.label}</span>
             </button>
           ))}
         </div>
@@ -362,12 +351,32 @@ export default function App() {
       {!done && (
         <footer className="border-t border-line px-3.5 py-3">
           {!running ? (
-            <button
-              onClick={start}
-              className="w-full rounded-xl bg-primary py-3.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90"
-            >
-              ▶ Play
-            </button>
+            <div className="flex flex-col gap-2.5">
+              {isScenario && (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Speed</span>
+                  {[1, 2, 4].map((sp) => (
+                    <button
+                      key={sp}
+                      onClick={() => setSpeed(sp)}
+                      className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition-all active:scale-95 ${
+                        speed === sp
+                          ? 'bg-primary/15 text-primary ring-primary/40'
+                          : 'text-ink-secondary ring-line hover:text-ink'
+                      }`}
+                    >
+                      {sp}×
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={start}
+                className="w-full rounded-xl bg-primary py-3.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90"
+              >
+                ▶ Play
+              </button>
+            </div>
           ) : (
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
               <div className="flex flex-1 gap-2">
