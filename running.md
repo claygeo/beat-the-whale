@@ -5,11 +5,11 @@
 > Bar: **production 10/10**. Targets: **desktop + iOS Safari + Twitter/IG in-app webviews**.
 
 ## 🔁 LOOP STATE — read this first every iteration
-**Mode:** autonomous `/loop` (self-paced). **Repo:** `C:\Users\clayg\OneDrive\Desktop\beat-the-whale` → github.com/claygeo/beat-the-whale (public). **Supabase:** `gauzdvauqsiyazassrnc` (org CG, us-east-1). **Memory:** `project_beat_the_whale_2026_06_06.md`.
+**Mode:** autonomous `/loop` (self-paced). **Repo:** `C:\Users\clayg\OneDrive\Desktop\beat-the-whale` → github.com/claygeo/beat-the-whale (public). **Supabase:** `gauzdvauqsiyazassrnc` (org CG, us-east-1). **Memory:** `project_beat_the_whale_2026_06_06.md`. **🟢 LIVE:** https://beat-the-whale-clay.netlify.app (Netlify project `babbe18b-a21b-4df7-ae66-562436d0aad4`, team CG/claygeo4; deploy via `netlify deploy --prod --dir dist` from the linked folder).
 
 **Iteration protocol:** (1) read this file → (2) do the **NEXT TASK** → (3) verify (build / test / preview) → (4) commit + push — ALWAYS strip the auto-injected `geobridge` dep from package.json first (atomic strip+commit) → (5) check off the task + set a new NEXT TASK → (6) continue.
 
-**▶ NEXT TASK:** Deploy to Netlify — get the live URL. Free-play game is fully playable + verified (trade, ghost markers, racing equity curves, result). Deploy on sample data first to establish the Netlify site + SPA build, THEN swap sample→live HL data, THEN `/qa`. (Netlify CLI installed; site e.g. `beat-the-whale`.)
+**▶ NEXT TASK:** Swap sample data → live Hyperliquid data — `fetchCandles` for a real coin's recent window + `fetchUserFillsByTime` for a known whale, client-side, with loading + error states; map fills → ghost trades + compute whale realized PnL/start-equity; redeploy. THEN `/qa` + `/qa-design-review` on the live site (mobile / desktop / X-webview).
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
@@ -54,7 +54,7 @@ global leaderboard, plus unranked free-play.
 - [x] Apply 0001_init migration → schema LIVE (codex-hardened: RLS deny-all, SECURITY DEFINER read API)
 - [x] Security advisors verified → search_path fix applied; remaining lints intentional-by-design
 - [x] HL data layer (`src/lib/hyperliquid.ts`): candles + userFillsByTime/closedPnl, typed + paginated
-- [ ] Netlify site + env vars
+- [x] Netlify site + deploy → https://beat-the-whale-clay.netlify.app (LIVE, sample-data build; env vars added when ranked needs them)
 - [x] GitHub repo live → claygeo/beat-the-whale (public)
 
 ### Phase 3 — Build
