@@ -4,6 +4,17 @@
 > Owner: Claude (full autonomy). Operator: @deforestpeg (Clayton).
 > Bar: **production 10/10**. Targets: **desktop + iOS Safari + Twitter/IG in-app webviews**.
 
+## 🔁 LOOP STATE — read this first every iteration
+**Mode:** autonomous `/loop` (self-paced). **Repo:** `C:\Users\clayg\OneDrive\Desktop\beat-the-whale` → github.com/claygeo/beat-the-whale (public). **Supabase:** `gauzdvauqsiyazassrnc` (org CG, us-east-1). **Memory:** `project_beat_the_whale_2026_06_06.md`.
+
+**Iteration protocol:** (1) read this file → (2) do the **NEXT TASK** → (3) verify (build / test / preview) → (4) commit + push — ALWAYS strip the auto-injected `geobridge` dep from package.json first (atomic strip+commit) → (5) check off the task + set a new NEXT TASK → (6) continue.
+
+**▶ NEXT TASK:** Free-play game UI — chart component (lightweight-charts) rendering HL candles with deterministic replay playback (fed by `src/lib/hyperliquid.ts` + `tickAtElapsed`). Then ghost markers, dual equity curves, paper-trade controls. Free-play needs no backend (pure client vs HL API) → fastest path to deployable + QA-able.
+
+**Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
+
+**Gotchas:** geobridge re-injects on tool calls (strip every commit); codex needs prompt via STDIN pipe; codex file-reads fail in sandbox; free-play = client-side HL (no Supabase), ranked = frozen data + server scoring.
+
 ## What it is
 Race a real Hyperliquid whale's recorded trades. Replay a historical market window on an
 animated chart; the whale's real entries/exits appear as "ghost" markers at the true
@@ -50,7 +61,7 @@ global leaderboard, plus unranked free-play.
 - [x] Frontend scaffold + design system + tokens (full responsive UI still to come)
 - [x] HL data layer (candles, whale fills, closedPnl) + types
 - [x] Replay engine built + compiles (`src/lib/replay.ts`): deterministic clock + paper sim + whale ghost curve
-- [ ] Replay engine UNIT TESTS (prove the scoring math before trusting it) ← next
+- [x] Replay engine unit tests — 7 passing (PnL long/short, liquidation, close-realization, determinism, whale curve)
 - [ ] Wire engine → chart UI
 - [ ] Chart + whale ghost markers
 - [ ] Paper execution (long/short, size, leverage, fees/slippage)
