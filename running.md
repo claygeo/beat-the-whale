@@ -47,9 +47,11 @@ global leaderboard, plus unranked free-play.
 - [x] GitHub repo live → claygeo/beat-the-whale (public)
 
 ### Phase 3 — Build
-- [ ] Frontend scaffold + design system + responsive shell (desktop/iOS/webview)
-- [ ] HL data layer (candles, whale fills, closedPnl) + types
-- [ ] Replay engine (deterministic sim clock, candle stream, no look-ahead)
+- [x] Frontend scaffold + design system + tokens (full responsive UI still to come)
+- [x] HL data layer (candles, whale fills, closedPnl) + types
+- [x] Replay engine built + compiles (`src/lib/replay.ts`): deterministic clock + paper sim + whale ghost curve
+- [ ] Replay engine UNIT TESTS (prove the scoring math before trusting it) ← next
+- [ ] Wire engine → chart UI
 - [ ] Chart + whale ghost markers
 - [ ] Paper execution (long/short, size, leverage, fees/slippage)
 - [ ] Dual live equity curves (you vs whale)
