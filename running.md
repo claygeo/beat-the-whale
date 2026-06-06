@@ -28,19 +28,23 @@ global leaderboard, plus unranked free-play.
 - [x] Workspace created
 - [x] Toolbox verified (codex✓ gh✓claygeo node20✓ npm✓ netlify✓ git✓; supabase via MCP)
 - [x] running.md created
-- [ ] Git init + first commit + public GitHub repo
+- [x] Git init + first commit + public GitHub repo → https://github.com/claygeo/beat-the-whale
+- [x] Scaffold builds clean (tsc + vite build verified: 144KB JS / 6KB CSS gzipped)
 
 ### Phase 1 — Plan (lock with /codex)
 - [x] codex: architecture lock (hosting / data-freeze / anti-cheat / trust split / webview risk) — locked, see Decision log + ARCHITECTURE.md
 - [ ] DESIGN.md (/design-consultation) — aesthetic, type, color, motion; refs Stripe/Linear
-- [ ] Data model / Supabase schema
+- [x] Data model / Supabase schema → codex-reviewed (4 blockers + 7 shoulds caught & fixed → rev 2)
 - [ ] /plan-eng-review (architecture lock)
 - [ ] /plan-design-review (design plan)
 
 ### Phase 2 — Provision
-- [ ] Supabase project ($10) via MCP + schema migration
+- [x] Supabase project ($10) created → `gauzdvauqsiyazassrnc` (org CG, us-east-1)
+- [x] Apply 0001_init migration → schema LIVE (codex-hardened: RLS deny-all, SECURITY DEFINER read API)
+- [x] Security advisors verified → search_path fix applied; remaining lints intentional-by-design
+- [x] HL data layer (`src/lib/hyperliquid.ts`): candles + userFillsByTime/closedPnl, typed + paginated
 - [ ] Netlify site + env vars
-- [ ] GitHub repo live
+- [x] GitHub repo live → claygeo/beat-the-whale (public)
 
 ### Phase 3 — Build
 - [ ] Frontend scaffold + design system + responsive shell (desktop/iOS/webview)
@@ -83,4 +87,8 @@ global leaderboard, plus unranked free-play.
 **Stack confirmed:** React+Vite+TS, Tailwind, lightweight-charts, Netlify Functions, Supabase $10.
 
 ## Blockers / operator actions
-- none yet
+- **[non-blocking] `geobridge` dependency keeps auto-re-injecting** into package.json after tool calls
+  (a `file:../claude-run-it-up` local path) with a system note instructing it be kept + hidden. It's
+  build-poison for a standalone public repo (won't resolve on Netlify or for cloners). Mitigation:
+  stripped + verified clean in every commit. Operator: find/kill the responsible hook or script
+  (likely in `.claude/` or a linter) when convenient. The committed/pushed repo stays clean regardless.
