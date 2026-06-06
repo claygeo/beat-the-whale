@@ -17,7 +17,7 @@ export type ScenarioKey = 'flash_crash' | 'slow_crash' | 'fast_pump' | 'slow_pum
 export const STREAM_HZ = 40
 export const STREAM_DT = 1000 / STREAM_HZ // 25 ms per sub-tick — the "high TPS" stream
 export const SCENARIO_PRICE0 = 100
-export const SCENARIO_LENGTH_MS = 90_000
+export const SCENARIO_LENGTH_MS = 60_000
 
 export interface ScenarioBand {
   key: ScenarioKey
@@ -169,6 +169,8 @@ export function pathToCandles(path: ScenarioPath, candleMs = 1000, uptoMs?: numb
   const lastI = uptoMs == null ? path.prices.length - 1 : Math.min(path.prices.length - 1, Math.floor(uptoMs / STREAM_DT))
   const t0 = 1_700_000_000_000
   const candles: Candle[] = []
+  // `t` is a chart-axis value only: 1 unique second per candle so lightweight-charts never sees a
+  // duplicate/non-ascending time (real cadence is governed by the replay clock's msPerTick).
   for (let start = 0, ci = 0; start <= lastI; start += perCandle, ci++) {
     const end = Math.min(lastI, start + perCandle - 1)
     let h = path.prices[start]
@@ -178,7 +180,7 @@ export function pathToCandles(path: ScenarioPath, candleMs = 1000, uptoMs?: numb
       if (p > h) h = p
       if (p < l) l = p
     }
-    candles.push({ t: t0 + ci * candleMs, o: path.prices[start], h, l, c: path.prices[end], v: 0 })
+    candles.push({ t: t0 + ci * 1000, o: path.prices[start], h, l, c: path.prices[end], v: 0 })
   }
   return candles
 }

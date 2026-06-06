@@ -6,6 +6,16 @@ import { sampleCandles, sampleGhost } from './lib/sample'
 import { simulate, whaleCurve, type GhostTrade, type OrderIntent } from './lib/replay'
 import { buildChallengeFromWallet, FEATURED_WHALES, type Challenge } from './lib/challenge'
 import {
+  SCENARIOS,
+  createPath,
+  injectEvent,
+  pathToCandles,
+  botOrders,
+  botCurve,
+  type ScenarioKey,
+  type ScenarioPath,
+} from './lib/scenario'
+import {
   loadDailyChallenge,
   submitRankedAttempt,
   getLeaderboard,
@@ -16,6 +26,11 @@ import type { Candle } from './lib/hyperliquid'
 
 const TARGET_REPLAY_MS = 60_000
 const START_EQUITY = 10_000
+const SCENARIO_CANDLE_MS = 500
+const BOT_SIZE = 3_000
+const BOT_LEV = 3
+
+type Mode = 'replay' | 'scenario'
 
 interface Active {
   coin: string
@@ -31,6 +46,7 @@ export default function App() {
     return { coin: 'SAMPLE', label: 'Sample whale', candles, ghost: sampleGhost(candles), startEquity: START_EQUITY }
   }, [])
 
+  const [mode, setMode] = useState<Mode>('replay')
   const [challenge, setChallenge] = useState<Challenge | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,13 +55,13 @@ export default function App() {
   const [source, setSource] = useState<string>('sample')
   const [showWallet, setShowWallet] = useState(false)
 
+  // scenario / arcade
+  const [scenarioPath, setScenarioPath] = useState<ScenarioPath | null>(null)
+  const [eventsVersion, setEventsVersion] = useState(0)
+  const [speed, setSpeed] = useState(1)
+
+  const isScenario = mode === 'scenario'
   const active: Active = challenge ?? sample
-  const { candles, ghost } = active
-  const tickCount = candles.length - 1
-  const whaleEq = useMemo(
-    () => whaleCurve(ghost, candles, active.startEquity),
-    [ghost, candles, active.startEquity],
-  )
 
   const [running, setRunning] = useState(false)
   const [runKey, setRunKey] = useState(0)
@@ -53,17 +69,45 @@ export default function App() {
   const [size, setSize] = useState(2000)
   const [leverage, setLeverage] = useState(5)
 
-  const msPerTick = useMemo(
-    () => Math.min(350, Math.max(60, Math.round(TARGET_REPLAY_MS / Math.max(1, tickCount)))),
-    [tickCount],
+  const scenarioCandles = useMemo(
+    () => (scenarioPath ? pathToCandles(scenarioPath, SCENARIO_CANDLE_MS) : []),
+    // eventsVersion busts the memo when injectEvent mutates the path in place
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scenarioPath, eventsVersion],
   )
+
+  const gameCandles = isScenario ? scenarioCandles : active.candles
+  const startEquity = active.startEquity
+  const tickCount = Math.max(0, gameCandles.length - 1)
+
+  const whaleEq = useMemo(
+    () => (isScenario ? [] : whaleCurve(active.ghost, active.candles, active.startEquity)),
+    [isScenario, active],
+  )
+  const botOrdersList = useMemo(
+    () => (isScenario && scenarioCandles.length ? botOrders(scenarioCandles, BOT_SIZE, BOT_LEV) : []),
+    [isScenario, scenarioCandles],
+  )
+  const botEq = useMemo(
+    () =>
+      isScenario && scenarioCandles.length
+        ? botCurve(scenarioCandles, startEquity, BOT_SIZE, BOT_LEV, tickCount)
+        : [],
+    [isScenario, scenarioCandles, startEquity, tickCount],
+  )
+
+  const msPerTick = useMemo(() => {
+    if (isScenario) return Math.max(60, Math.round(SCENARIO_CANDLE_MS / speed))
+    return Math.min(350, Math.max(60, Math.round(TARGET_REPLAY_MS / Math.max(1, tickCount))))
+  }, [isScenario, speed, tickCount])
+
   const tick = useReplayClock({ running, msPerTick, tickCount, runKey })
-  const done = running && tick >= tickCount
+  const done = running && tickCount > 0 && tick >= tickCount
   const pct = tickCount > 0 ? (Math.min(tick, tickCount) / tickCount) * 100 : 0
 
   const playerSim = useMemo(
-    () => simulate(candles, orders, active.startEquity, tick),
-    [candles, orders, active.startEquity, tick],
+    () => simulate(gameCandles, orders, startEquity, tick),
+    [gameCandles, orders, startEquity, tick],
   )
 
   const position = useMemo(() => {
@@ -77,8 +121,10 @@ export default function App() {
     return p
   }, [orders, tick])
 
-  const youPnl = playerSim.finalEquity - active.startEquity
-  const whalePnl = (whaleEq[Math.min(tick, tickCount)]?.equity ?? active.startEquity) - active.startEquity
+  const oppCurve = isScenario ? botEq : whaleEq
+  const youPnl = playerSim.finalEquity - startEquity
+  const oppPnl = (oppCurve[Math.min(tick, tickCount)]?.equity ?? startEquity) - startEquity
+  const oppVisible = oppCurve.slice(0, tick + 1)
 
   const place = (action: OrderIntent['action']) => {
     if (!running || done) return
@@ -90,9 +136,29 @@ export default function App() {
     setRunKey((k) => k + 1)
   }
   const start = () => {
+    if (isScenario) {
+      // Date.now() is the only entropy source; once chosen the path is fully deterministic.
+      setScenarioPath(createPath(Date.now() >>> 0))
+      setEventsVersion((v) => v + 1)
+    }
     setOrders([])
     setRunKey((k) => k + 1)
     setRunning(true)
+  }
+
+  const switchMode = (m: Mode) => {
+    if (m === mode) return
+    setMode(m)
+    setError(null)
+    setShowWallet(false)
+    resetGame()
+    if (m === 'scenario' && !scenarioPath) setScenarioPath(createPath(Date.now() >>> 0))
+  }
+
+  const injectScenario = (key: ScenarioKey) => {
+    if (!isScenario || !scenarioPath || !running || done) return
+    injectEvent(scenarioPath, key, tick * SCENARIO_CANDLE_MS)
+    setEventsVersion((v) => v + 1)
   }
 
   const loadWhale = async (addr: string, label?: string) => {
@@ -140,19 +206,44 @@ export default function App() {
     resetGame()
   }
 
-  const markers: WhaleMarker[] = ghost
-    .filter((g) => g.tickIndex <= tick)
-    .map((g) => ({
-      time: Math.floor(candles[g.tickIndex].t / 1000),
-      aboveBar: !g.dir?.includes('Long'),
-      up: !!g.dir?.includes('Long'),
-      text: g.dir ?? '',
-    }))
-  const whaleVisible = whaleEq.slice(0, tick + 1)
+  const markers: WhaleMarker[] = isScenario
+    ? botOrdersList
+        .filter((o) => o.tick <= tick && scenarioCandles[o.tick])
+        .map((o) => ({
+          time: Math.floor(scenarioCandles[o.tick].t / 1000),
+          aboveBar: o.action === 'open_short',
+          up: o.action === 'open_long',
+          text: o.action === 'open_long' ? 'Bot Long' : 'Bot Short',
+        }))
+    : active.ghost
+        .filter((g) => g.tickIndex <= tick)
+        .map((g) => ({
+          time: Math.floor(active.candles[g.tickIndex].t / 1000),
+          aboveBar: !g.dir?.includes('Long'),
+          up: !!g.dir?.includes('Long'),
+          text: g.dir ?? '',
+        }))
 
   return (
     <main className="flex h-dvh flex-col bg-bg">
-      <header className="flex items-center justify-between gap-2 border-b border-line px-3.5 py-2.5">
+      {/* mode tabs */}
+      <div className="flex shrink-0 border-b border-line">
+        {(['replay', 'scenario'] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => switchMode(m)}
+            className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+              mode === m
+                ? 'border-b-2 border-primary text-ink'
+                : 'border-b-2 border-transparent text-ink-secondary hover:text-ink'
+            }`}
+          >
+            {m === 'replay' ? '🐋 Whale Race' : '🎮 Arcade'}
+          </button>
+        ))}
+      </div>
+
+      <header className="flex items-center justify-between gap-2 px-3.5 py-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="text-base" role="img" aria-label="whale">
             🐋
@@ -163,35 +254,67 @@ export default function App() {
         </div>
         <div className="flex shrink-0 items-center gap-3 text-[11px] sm:gap-4">
           <Pnl label="You" value={youPnl} className="text-racer-you" />
-          <Pnl label="Whale" value={whalePnl} className="text-racer-whale" />
+          <Pnl label={isScenario ? 'Bot' : 'Whale'} value={oppPnl} className="text-racer-whale" />
         </div>
       </header>
 
-      {/* race selector — pick who you're up against */}
-      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto border-b border-line px-3 py-2">
-        <RaceChip active={source === 'daily'} onClick={loadDaily} disabled={loading} accent="warn">
-          🏆 Daily
-        </RaceChip>
-        {FEATURED_WHALES.map((w) => (
-          <RaceChip
-            key={w.address}
-            active={source === w.address.toLowerCase()}
-            onClick={() => loadWhale(w.address, w.label)}
-            disabled={loading}
-          >
-            {w.label}
+      {/* selector row — replay: pick an opponent · arcade: inject events + speed */}
+      {isScenario ? (
+        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto border-y border-line px-3 py-2">
+          {Object.values(SCENARIOS).map((s) => (
+            <button
+              key={s.key}
+              onClick={() => injectScenario(s.key)}
+              disabled={!running || done}
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-all active:scale-95 disabled:opacity-40 ${
+                s.dir < 0
+                  ? 'text-down ring-down/30 hover:bg-down/10'
+                  : 'text-up ring-up/30 hover:bg-up/10'
+              }`}
+            >
+              {s.emoji} {s.label}
+            </button>
+          ))}
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-line" />
+          {[1, 2, 4].map((sp) => (
+            <button
+              key={sp}
+              onClick={() => setSpeed(sp)}
+              disabled={running}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset transition-all active:scale-95 disabled:opacity-40 ${
+                speed === sp ? 'bg-primary/15 text-primary ring-primary/40' : 'text-ink-secondary ring-line hover:text-ink'
+              }`}
+            >
+              {sp}×
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto border-y border-line px-3 py-2">
+          <RaceChip active={source === 'daily'} onClick={loadDaily} disabled={loading} accent="warn">
+            🏆 Daily
           </RaceChip>
-        ))}
-        <RaceChip active={source === 'sample'} onClick={useSample} disabled={loading}>
-          Sample
-        </RaceChip>
-        <span className="mx-0.5 h-4 w-px shrink-0 bg-line" />
-        <RaceChip active={showWallet} onClick={() => setShowWallet((v) => !v)} disabled={loading}>
-          + Wallet
-        </RaceChip>
-      </div>
+          {FEATURED_WHALES.map((w) => (
+            <RaceChip
+              key={w.address}
+              active={source === w.address.toLowerCase()}
+              onClick={() => loadWhale(w.address, w.label)}
+              disabled={loading}
+            >
+              {w.label}
+            </RaceChip>
+          ))}
+          <RaceChip active={source === 'sample'} onClick={useSample} disabled={loading}>
+            Sample
+          </RaceChip>
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-line" />
+          <RaceChip active={showWallet} onClick={() => setShowWallet((v) => !v)} disabled={loading}>
+            + Wallet
+          </RaceChip>
+        </div>
+      )}
 
-      {showWallet && (
+      {showWallet && !isScenario && (
         <div className="flex items-center gap-2 border-b border-line px-3 py-2 animate-fade-in">
           <input
             value={address}
@@ -219,18 +342,12 @@ export default function App() {
       )}
 
       {/* the race — who's ahead, live */}
-      <RaceLane
-        youPnl={youPnl}
-        whalePnl={whalePnl}
-        startEquity={active.startEquity}
-        pct={pct}
-        live={running && !done}
-      />
+      <RaceLane youPnl={youPnl} oppPnl={oppPnl} oppEmoji={isScenario ? '🤖' : '🐋'} startEquity={startEquity} pct={pct} live={running && !done} />
 
       <div className="relative min-h-0 flex-1">
-        <CandleChart candles={candles} visibleTick={tick} markers={markers} />
+        <CandleChart candles={gameCandles} visibleTick={tick} markers={markers} />
         {loading && <LoadingOverlay />}
-        {!running && !done && !loading && <StartHint label={active.label} coin={active.coin} />}
+        {!running && !done && !loading && <StartHint mode={mode} label={active.label} coin={active.coin} />}
         {position && (
           <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-lg border border-line bg-surface/85 px-2.5 py-1 text-[11px] backdrop-blur-sm">
             <span className={`font-semibold ${position.side === 'long' ? 'text-up' : 'text-down'}`}>
@@ -242,15 +359,10 @@ export default function App() {
           </div>
         )}
         {done &&
-          (rankedId ? (
-            <RankedResult
-              challengeId={rankedId}
-              youPnl={youPnl}
-              whalePnl={whalePnl}
-              orders={orders}
-            />
+          (!isScenario && rankedId ? (
+            <RankedResult challengeId={rankedId} youPnl={youPnl} whalePnl={oppPnl} orders={orders} />
           ) : (
-            <ResultOverlay youPnl={youPnl} whalePnl={whalePnl} onReplay={start} />
+            <ResultOverlay youPnl={youPnl} oppPnl={oppPnl} opponent={isScenario ? 'bot' : 'whale'} onReplay={start} />
           ))}
       </div>
 
@@ -258,7 +370,7 @@ export default function App() {
         <div className="pointer-events-none absolute left-3 top-2 z-10 text-[10px] font-medium uppercase tracking-wide text-ink-muted">
           Equity race
         </div>
-        <EquityChart you={playerSim.curve} whale={whaleVisible} />
+        <EquityChart you={playerSim.curve} whale={oppVisible} />
       </div>
 
       {!done && (
@@ -335,23 +447,25 @@ function RaceChip({
 
 function RaceLane({
   youPnl,
-  whalePnl,
+  oppPnl,
+  oppEmoji,
   startEquity,
   pct,
   live,
 }: {
   youPnl: number
-  whalePnl: number
+  oppPnl: number
+  oppEmoji: string
   startEquity: number
   pct: number
   live: boolean
 }) {
   // normalize PnL onto the track: breakeven = center, leader slides toward the finish
-  const ref = Math.max(Math.abs(youPnl), Math.abs(whalePnl), startEquity * 0.02)
+  const ref = Math.max(Math.abs(youPnl), Math.abs(oppPnl), startEquity * 0.02)
   const place = (v: number) => Math.max(6, Math.min(94, 50 + (v / ref) * 44))
   const youX = place(youPnl)
-  const whaleX = place(whalePnl)
-  const youAhead = youPnl >= whalePnl
+  const oppX = place(oppPnl)
+  const youAhead = youPnl >= oppPnl
   return (
     <div className="shrink-0 border-b border-line bg-surface/30 px-3 py-2">
       <div className="relative h-7 overflow-hidden rounded-md bg-bg/60 ring-1 ring-inset ring-line">
@@ -377,17 +491,17 @@ function RaceLane({
             You
           </span>
         </div>
-        {/* whale (lower lane) */}
+        {/* opponent (lower lane) */}
         <div
           className="absolute bottom-0.5 -translate-x-1/2 transition-[left] duration-300 ease-out"
-          style={{ left: `${whaleX}%` }}
+          style={{ left: `${oppX}%` }}
         >
           <span
             className={`rounded-full bg-racer-whale/20 px-1.5 py-px text-[9px] font-bold leading-tight text-racer-whale ring-1 ring-inset ring-racer-whale/50 ${
               !youAhead && live ? 'shadow-[0_0_8px_0] shadow-racer-whale/50' : ''
             }`}
           >
-            🐋
+            {oppEmoji}
           </span>
         </div>
       </div>
@@ -450,7 +564,25 @@ function Stepper({
   )
 }
 
-function StartHint({ label, coin }: { label: string; coin: string }) {
+function StartHint({ mode, label, coin }: { mode: Mode; label: string; coin: string }) {
+  if (mode === 'scenario') {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg/75 px-8 text-center backdrop-blur-[2px] animate-fade-in">
+        <span className="text-5xl">🎮</span>
+        <span className="text-xl font-bold tracking-tight text-ink">Trade the chaos</span>
+        <p className="max-w-[19rem] text-[13px] leading-relaxed text-ink-secondary">
+          A live synthetic market. Go long or short and beat the{' '}
+          <span className="font-semibold text-racer-whale">bot&apos;s</span> PnL by the end. Slam the{' '}
+          <span className="font-semibold text-down">⚡ crash</span> /{' '}
+          <span className="font-semibold text-up">🚀 pump</span> buttons to swing the market — random
+          size + timing every run.
+        </p>
+        <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-bg">
+          ▶ Press play to start
+        </span>
+      </div>
+    )
+  }
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg/75 px-8 text-center backdrop-blur-[2px] animate-fade-in">
       <span className="text-5xl">🐋</span>
@@ -605,19 +737,22 @@ function RankedResult({
 
 function ResultOverlay({
   youPnl,
-  whalePnl,
+  oppPnl,
+  opponent,
   onReplay,
 }: {
   youPnl: number
-  whalePnl: number
+  oppPnl: number
+  opponent: 'whale' | 'bot'
   onReplay: () => void
 }) {
-  const beat = youPnl > whalePnl
-  const diff = youPnl - whalePnl
+  const beat = youPnl > oppPnl
+  const diff = youPnl - oppPnl
+  const oppEmoji = opponent === 'bot' ? '🤖' : '🐋'
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg/85 px-6 text-center backdrop-blur-sm animate-pop-in">
       <span className="text-2xl font-bold tracking-tight text-ink">
-        {beat ? 'You beat the whale 🎉' : 'The whale won 🐋'}
+        {beat ? `You beat the ${opponent} 🎉` : `The ${opponent} won ${oppEmoji}`}
       </span>
       <span className={`text-base font-semibold ${beat ? 'text-up' : 'text-down'}`}>
         by <span className="font-mono tabular-nums">${Math.abs(diff).toFixed(0)}</span>
@@ -626,7 +761,7 @@ function ResultOverlay({
         onClick={onReplay}
         className="mt-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90"
       >
-        Play again
+        {opponent === 'bot' ? 'New run' : 'Play again'}
       </button>
     </div>
   )
