@@ -65,19 +65,19 @@ export default function App() {
 
   return (
     <main className="flex h-dvh flex-col bg-bg">
-      <header className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <span className="text-lg" role="img" aria-label="whale">
+      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="text-base" role="img" aria-label="whale">
             🐋
           </span>
-          <span className="font-display text-sm font-bold tracking-tight text-ink">
+          <span className="whitespace-nowrap font-display text-sm font-bold tracking-tight text-ink">
             Beat the Whale
           </span>
-          <span className="rounded-sm border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-secondary">
+          <span className="hidden rounded-sm border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-secondary sm:inline-block">
             free play
           </span>
         </div>
-        <div className="flex items-center gap-3 font-mono text-[11px] tabular-nums sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2.5 font-mono text-[11px] tabular-nums sm:gap-4">
           <Pnl label="you" value={youPnl} className="text-racer-you" />
           <Pnl label="whale" value={whalePnl} className="text-racer-whale" />
           <span className="text-ink-muted">
@@ -106,41 +106,45 @@ export default function App() {
         <EquityChart you={playerSim.curve} whale={whaleVisible} />
       </div>
 
-      <footer className="border-t border-line px-4 py-3">
-        {!running || done ? (
-          <button
-            onClick={start}
-            className="w-full rounded-md border border-primary-muted bg-primary-muted/40 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-primary transition-colors hover:bg-primary-muted/60"
-          >
-            {done ? 'play again' : '▶ play'}
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
+      {!done && (
+        <footer className="border-t border-line px-4 py-3">
+          {!running ? (
             <button
-              onClick={() => place('open_long')}
-              className="flex-1 rounded-md border border-up/30 bg-up/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-up transition-colors hover:bg-up/20"
+              onClick={start}
+              className="w-full rounded-md border border-primary-muted bg-primary-muted/40 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-primary transition-colors hover:bg-primary-muted/60"
             >
-              long
+              ▶ play
             </button>
-            <button
-              onClick={() => place('open_short')}
-              className="flex-1 rounded-md border border-down/30 bg-down/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-down transition-colors hover:bg-down/20"
-            >
-              short
-            </button>
-            <button
-              onClick={() => place('close')}
-              className="flex-1 rounded-md border border-line py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-ink-secondary transition-colors hover:bg-surface-hover"
-            >
-              close
-            </button>
-            <div className="ml-1 flex items-center gap-1.5">
+          ) : (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-1 gap-2">
+              <button
+                onClick={() => place('open_long')}
+                className="flex-1 rounded-md border border-up/30 bg-up/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-up transition-colors hover:bg-up/20"
+              >
+                long
+              </button>
+              <button
+                onClick={() => place('open_short')}
+                className="flex-1 rounded-md border border-down/30 bg-down/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-down transition-colors hover:bg-down/20"
+              >
+                short
+              </button>
+              <button
+                onClick={() => place('close')}
+                className="flex-1 rounded-md border border-line py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-ink-secondary transition-colors hover:bg-surface-hover"
+              >
+                close
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 sm:justify-end">
               <Stepper label="size" value={size} onChange={setSize} step={500} prefix="$" />
               <Stepper label="lev" value={leverage} onChange={setLeverage} step={1} suffix="x" />
             </div>
           </div>
         )}
-      </footer>
+        </footer>
+      )}
     </main>
   )
 }

@@ -75,9 +75,10 @@ global leaderboard, plus unranked free-play.
 - [ ] Free-play mode (pick any whale)
 
 ### Phase 4 — Cross-platform hardening
-- [ ] Desktop layouts
-- [ ] iOS Safari (safe-area insets, viewport, touch)
-- [ ] Twitter/IG in-app webview (storage, no-popup share fallback) — REAL device test
+- [x] Mobile (375px) QA: header nowrap + badge hidden, trade controls stack on narrow — verified live
+- [x] **Webview replay-freeze FIXED**: rAF is paused in backgrounded / in-app webviews → added a `setInterval` fallback that drives the wall-clock tick (verified the replay advances in a backgrounded preview). This was the #1 webview risk codex flagged.
+- [x] Result UX: consolidated to a single CTA (footer hidden behind the result overlay)
+- [ ] Desktop/tablet layout re-verify + iOS Safari safe-area + real X in-app webview device test
 
 ### Phase 5 — QA + review
 - [ ] /qa (functional)
