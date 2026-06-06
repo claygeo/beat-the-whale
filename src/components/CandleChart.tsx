@@ -10,12 +10,13 @@ import {
 } from 'lightweight-charts'
 import type { Candle } from '../lib/hyperliquid'
 
-/** A whale ghost marker (entry/exit), decoupled from lightweight-charts' types. */
+/** A chart marker (whale entry/exit, or a player-injected arcade event). */
 export interface WhaleMarker {
   time: number
   aboveBar: boolean
   up: boolean
   text: string
+  color?: string
 }
 
 /** Premium dark candlestick chart (GeoBridge palette). Reveals candles up to `visibleTick`. */
@@ -84,7 +85,7 @@ export function CandleChart({
     const m: SeriesMarker<UTCTimestamp>[] = markers.map((x) => ({
       time: x.time as UTCTimestamp,
       position: x.aboveBar ? 'aboveBar' : 'belowBar',
-      color: '#fbbf24',
+      color: x.color ?? '#fbbf24',
       shape: x.up ? 'arrowUp' : 'arrowDown',
       text: x.text,
     }))

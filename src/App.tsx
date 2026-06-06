@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CandleChart, type WhaleMarker } from './components/CandleChart'
 import { EquityChart } from './components/EquityChart'
 import { useReplayClock } from './hooks/useReplayClock'
@@ -27,6 +27,16 @@ import type { Candle } from './lib/hyperliquid'
 const TARGET_REPLAY_MS = 60_000
 const START_EQUITY = 10_000
 const SCENARIO_CANDLE_MS = 500
+const ARCADE_BEST_KEY = 'btw_arcade_best'
+
+function readArcadeBest(): number | null {
+  try {
+    const v = localStorage.getItem(ARCADE_BEST_KEY)
+    return v != null && v !== '' ? Number(v) : null
+  } catch {
+    return null
+  }
+}
 
 type Mode = 'replay' | 'scenario'
 
@@ -57,6 +67,8 @@ export default function App() {
   const [scenarioPath, setScenarioPath] = useState<ScenarioPath | null>(null)
   const [eventsVersion, setEventsVersion] = useState(0)
   const [speed, setSpeed] = useState(1)
+  const [arcadeBest, setArcadeBest] = useState<number | null>(readArcadeBest)
+  const runStartBest = useRef<number | null>(null) // the best to beat, snapshotted when a run starts
 
   const isScenario = mode === 'scenario'
   const active: Active = challenge ?? sample
@@ -119,6 +131,20 @@ export default function App() {
   const oppPnl = (oppCurve[Math.min(tick, tickCount)]?.equity ?? startEquity) - startEquity
   const oppVisible = oppCurve.slice(0, tick + 1)
 
+  // arcade: persist the best run (the come-back hook). Fires once when a run finishes.
+  useEffect(() => {
+    if (!done || !isScenario) return
+    setArcadeBest((prev) => {
+      const next = prev == null ? youPnl : Math.max(prev, youPnl)
+      try {
+        localStorage.setItem(ARCADE_BEST_KEY, String(next))
+      } catch {
+        /* private mode / storage disabled — best just won't persist */
+      }
+      return next
+    })
+  }, [done, isScenario, youPnl])
+
   const place = (action: OrderIntent['action']) => {
     if (!running || done) return
     setOrders((os) => [...os, { tick, action, size, leverage }])
@@ -130,6 +156,7 @@ export default function App() {
   }
   const start = () => {
     if (isScenario) {
+      runStartBest.current = arcadeBest // the score to beat this run
       // Date.now() is the only entropy source; once chosen the path is fully deterministic.
       setScenarioPath(createPath(Date.now() >>> 0))
       setEventsVersion((v) => v + 1)
@@ -210,6 +237,7 @@ export default function App() {
           aboveBar: ev.magnitude < 0,
           up: ev.magnitude > 0,
           text: SCENARIOS[ev.key].emoji,
+          color: '#4a9eff', // player-blue: these are YOUR events, not the opponent's
         }))
     : active.ghost
         .filter((g) => g.tickIndex <= tick)
@@ -332,7 +360,9 @@ export default function App() {
       <div className="relative min-h-0 flex-1">
         <CandleChart candles={gameCandles} visibleTick={tick} markers={markers} />
         {loading && <LoadingOverlay />}
-        {!running && !done && !loading && <StartHint mode={mode} label={active.label} coin={active.coin} />}
+        {!running && !done && !loading && (
+          <StartHint mode={mode} label={active.label} coin={active.coin} arcadeBest={arcadeBest} />
+        )}
         {position && (
           <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-lg border border-line bg-surface/85 px-2.5 py-1 text-[11px] backdrop-blur-sm">
             <span className={`font-semibold ${position.side === 'long' ? 'text-up' : 'text-down'}`}>
@@ -347,7 +377,13 @@ export default function App() {
           (!isScenario && rankedId ? (
             <RankedResult challengeId={rankedId} youPnl={youPnl} whalePnl={oppPnl} orders={orders} />
           ) : (
-            <ResultOverlay youPnl={youPnl} oppPnl={oppPnl} opponent={isScenario ? 'market' : 'whale'} onReplay={start} />
+            <ResultOverlay
+              youPnl={youPnl}
+              oppPnl={oppPnl}
+              opponent={isScenario ? 'market' : 'whale'}
+              best={isScenario ? runStartBest.current : null}
+              onReplay={start}
+            />
           ))}
       </div>
 
@@ -569,7 +605,17 @@ function Stepper({
   )
 }
 
-function StartHint({ mode, label, coin }: { mode: Mode; label: string; coin: string }) {
+function StartHint({
+  mode,
+  label,
+  coin,
+  arcadeBest,
+}: {
+  mode: Mode
+  label: string
+  coin: string
+  arcadeBest: number | null
+}) {
   if (mode === 'scenario') {
     return (
       <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg/75 px-8 text-center backdrop-blur-[2px] animate-fade-in">
@@ -582,6 +628,14 @@ function StartHint({ mode, label, coin }: { mode: Mode; label: string; coin: str
           <span className="font-semibold text-up">🚀 pump</span> to manufacture your own moves (random
           size + timing every run). Your events swing your tape, not the Market&apos;s.
         </p>
+        {arcadeBest != null && (
+          <span className="text-[11px] text-ink-muted">
+            Best run ·{' '}
+            <span className={`font-mono font-semibold tabular-nums ${arcadeBest >= 0 ? 'text-up' : 'text-down'}`}>
+              {arcadeBest >= 0 ? '+' : '−'}${Math.abs(arcadeBest).toFixed(0)}
+            </span>
+          </span>
+        )}
         <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-bg">
           ▶ Press play to start
         </span>
@@ -744,16 +798,20 @@ function ResultOverlay({
   youPnl,
   oppPnl,
   opponent,
+  best,
   onReplay,
 }: {
   youPnl: number
   oppPnl: number
   opponent: 'whale' | 'market'
+  best: number | null
   onReplay: () => void
 }) {
   const beat = youPnl > oppPnl
   const diff = youPnl - oppPnl
   const oppEmoji = opponent === 'market' ? '📊' : '🐋'
+  const isArcade = opponent === 'market'
+  const isNewBest = isArcade && (best == null || youPnl > best)
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg/85 px-6 text-center backdrop-blur-sm animate-pop-in">
       <span className="text-2xl font-bold tracking-tight text-ink">
@@ -762,6 +820,21 @@ function ResultOverlay({
       <span className={`text-base font-semibold ${beat ? 'text-up' : 'text-down'}`}>
         by <span className="font-mono tabular-nums">${Math.abs(diff).toFixed(0)}</span>
       </span>
+      {isArcade &&
+        (isNewBest ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-warn/15 px-3 py-1 text-xs font-bold text-warn ring-1 ring-inset ring-warn/40">
+            🏆 New best run · <span className="font-mono tabular-nums">{youPnl >= 0 ? '+' : '−'}${Math.abs(youPnl).toFixed(0)}</span>
+          </span>
+        ) : (
+          best != null && (
+            <span className="text-[11px] text-ink-muted">
+              Best run ·{' '}
+              <span className="font-mono tabular-nums text-ink-secondary">
+                {best >= 0 ? '+' : '−'}${Math.abs(best).toFixed(0)}
+              </span>
+            </span>
+          )
+        ))}
       <button
         onClick={onReplay}
         className="mt-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90"
