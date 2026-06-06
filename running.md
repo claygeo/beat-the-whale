@@ -11,7 +11,7 @@
 
 **Ranked architecture (codex-locked):** NO service-role key. (1) in-DB scoring via SECURITY DEFINER RPC (Postgres = authority); (2) ship-all-candles + UI-hide + one-shot/device (casual free leaderboard, not prize-grade); (3) pg_cron / manual-MCP freeze job. `submit_ranked_attempt` v1 applied (0002) — trusts client PnL within a bound + stores orders for audit.
 
-**▶ NEXT TASK (ranked, cont'd):** **Frontend ranked flow** — a "Daily Challenge" mode in App. Ranked READ+WRITE API is all live now: `get_active_challenge` (metadata), `get_challenge_replay` (frozen candles+ghost), `get_leaderboard`, `submit_ranked_attempt`. Flow: load active challenge → one-shot play (NO replay-after-submit) → on finish prompt a handle + generate a localStorage device-hash → `submit_ranked_attempt` (final_pnl/beat_whale/orders) → show result + leaderboard. THEN: full in-DB PnL recompute (replace trust-client, golden-test vs TS `simulate()`) + pg_cron daily freeze + share-card OG image.
+**▶ NEXT TASK (ranked, cont'd):** **Submit panel + leaderboard UI.** The daily challenge LOADS + PLAYS live now (`ranked.ts` + 🏆 Daily button). Remaining: on ranked finish (`rankedId` set + done), show a submit panel — handle input → `submitRankedAttempt({finalPnl, beatWhale, orders})` (device-hash from localStorage; surface `already_played`/errors) → then render the leaderboard (`getLeaderboard`). Enforce one-shot (no replay in ranked). THEN: full in-DB PnL recompute (golden-test vs TS `simulate()`) + pg_cron daily freeze + share-card OG image + endless /qa.
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
@@ -72,7 +72,8 @@ global leaderboard, plus unranked free-play.
 - [ ] Dual live equity curves (you vs whale)
 - [x] Daily challenge SEEDED — BTC swing race frozen into Supabase via `scripts/seed-challenge.ts` → MCP (28 candles + 23 whale trades; `get_active_challenge` ✓). pg_cron daily automation = later.
 - [~] Server-side ranked scoring — `submit_ranked_attempt` v1 applied (records attempt + orders, one-per-device, sanity bound); full in-DB PnL recompute vs TS engine = next
-- [ ] Leaderboard
+- [x] Ranked daily challenge front-end — `ranked.ts` (load/submit/leaderboard client) + 🏆 Daily button loads the frozen challenge from Supabase + plays (LIVE)
+- [~] Leaderboard — `get_leaderboard` RPC + `getLeaderboard` client ready; UI display = next (with submit panel)
 - [ ] Share card (server-rendered OG image)
 - [ ] Free-play mode (pick any whale)
 
