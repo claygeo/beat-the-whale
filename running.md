@@ -11,11 +11,21 @@
 
 **Ranked architecture (codex-locked):** NO service-role key. (1) in-DB scoring via SECURITY DEFINER RPC (Postgres = authority); (2) ship-all-candles + UI-hide + one-shot/device (casual free leaderboard, not prize-grade); (3) pg_cron / manual-MCP freeze job. `submit_ranked_attempt` v1 applied (0002) — trusts client PnL within a bound + stores orders for audit.
 
-**▶ NEXT TASK:** **Share card** — OG meta tags + image so the link preview on X/Twitter looks great (the distribution hook). v1 = strong static OG image (1200×630, game hero + tagline) + meta tags; v2 = dynamic per-result OG via a Netlify function. THEN hardening: full in-DB PnL recompute in `submit_ranked_attempt` (golden-test vs TS `simulate()`) + pg_cron daily freeze (replace manual seed). THEN endless `/qa` + `/qa-design-review` across mobile / desktop / X in-app webview, fixing each pass.
+**▶ NEXT TASK — 🎯 TASTE / UX OVERHAUL (operator redirect 2026-06-06; TOP priority over remaining features).**
+Game is feature-complete but reads "AI-built / confusing." Make it premium, simple, FUN, mobile-first ("wow
+that was fun, I'll come back"). In order:
+1. **Typography** — kill mono-everywhere → clean Claude-chat sans (**Inter**) for text; mono ONLY for numbers (PnL/price).
+2. **Clarity / onboarding** — a real intro screen (what is this? the amber markers = the whale's *real* trades you're racing; how to play in 1 line) + declutter the header + whale-source bar (the 0x address search confuses newcomers — make it secondary/optional).
+3. **Game-feel + mobile-first polish** — juice, satisfying interactions, thumb-friendly controls; verify on 375px + X webview.
+Use gstack `/design-review` + `/qa-design-review`; `/deep-research` for premium mobile-game / trading-UI references.
+THEN **Phase 2 = SCENARIO/ARCADE spice mode** (the hireable differentiator — see DIRECTION block). Deferred below taste: share card, in-DB PnL recompute, pg_cron daily freeze.
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
 **Gotchas:** geobridge re-injects on tool calls (strip every commit); codex needs prompt via STDIN pipe; codex file-reads fail in sandbox; free-play = client-side HL (no Supabase), ranked = frozen data + server scoring.
+
+**🎯 DIRECTION (operator redirect 2026-06-06):** taste/clarity/mobile-fun is the goal (it currently looks AI-built + confusing). After the taste overhaul, build **Phase 2 — Scenario/Arcade mode** (the engineering flex that gets him hired): flash-crash / slow-crash / fast-pump / slow-pump buttons using RNG (variable timing 5s–1min + variable magnitude within a per-scenario range, never a fixed %), + a speed mode + high-TPS "live" feel.
+**Whale-history consistency (operator flagged — important):** injecting crashes/pumps would violate the historic whale's recorded path. SOLUTION = keep modes SEPARATE: **Whale-Replay** = pure fixed historic path + the real whale ghost (consistent by construction); **Scenario/Arcade** = a PROCEDURAL synthetic price path (seeded RNG walk + injectable events) raced vs a simple REACTIVE ALGO opponent (or pure survival) — no pre-recorded whale to violate, so events are safe AND a high-TPS tick stream shows off the engineering. No race conditions / false states.
 
 ## What it is
 Race a real Hyperliquid whale's recorded trades. Replay a historical market window on an
