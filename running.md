@@ -9,7 +9,7 @@
 
 **Iteration protocol:** (1) read this file → (2) do the **NEXT TASK** → (3) verify (build / test / preview) → (4) commit + push — ALWAYS strip the auto-injected `geobridge` dep from package.json first (atomic strip+commit) → (5) check off the task + set a new NEXT TASK → (6) continue.
 
-**▶ NEXT TASK:** Swap sample data → live Hyperliquid data — `fetchCandles` for a real coin's recent window + `fetchUserFillsByTime` for a known whale, client-side, with loading + error states; map fills → ghost trades + compute whale realized PnL/start-equity; redeploy. THEN `/qa` + `/qa-design-review` on the live site (mobile / desktop / X-webview).
+**▶ NEXT TASK:** Polish live-data UX: (a) mobile-QA the new whale-source bar (horizontal scroll on 375px — verify usable + not cramped), (b) clearer load feedback for the ~10s fetch (spinner / disable, maybe a timeout), (c) curate 2-3 swing-trader featured whales (high ROI + lower volume = discrete directional trades, not HFT) so races are compelling. THEN ranked mode (daily challenge freeze + scoring fns + leaderboard).
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
@@ -64,7 +64,7 @@ global leaderboard, plus unranked free-play.
 - [x] Replay engine unit tests — 7 passing (PnL long/short, liquidation, close-realization, determinism, whale curve)
 - [x] Chart renders + deterministic replay playback (lightweight-charts) — verified live, 0 console errors
 - [x] Free-play GAME wired + verified live: paper trade (long/short/close + size/lev), whale ghost markers, dual racing equity curves, live you-vs-whale PnL, result overlay
-- [ ] Swap sample data → live Hyperliquid data (real coin candles + a known whale's fills)
+- [x] **Live Hyperliquid data** — `challenge.ts` builds a challenge from any wallet's dominant-coin fills (paste-wallet + 3 featured whales + sample toggle), normalized equity race (% on peak notional → $10k). Verified live racing a real ETH whale. Caveat: top-PnL whales are HFT (short/flat races, ~10s load) → curate swing whales next.
 - [ ] Chart + whale ghost markers
 - [ ] Paper execution (long/short, size, leverage, fees/slippage)
 - [ ] Dual live equity curves (you vs whale)
