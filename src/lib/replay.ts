@@ -163,20 +163,52 @@ export function simulate(
 // --------------------------- whale ghost ---------------------------
 
 /**
- * The whale's equity curve: startEquity + cumulative realized PnL (closedPnl), stepped at the
- * ticks where fills landed. closedPnl is authoritative (straight from the chain), so this curve
- * is the real target the player is racing.
+ * The whale's equity curve, MARKED TO MARKET so it races live instead of teleporting at closes.
+ *
+ * We reconstruct the whale's open position from its fills (signed size + VWAP entry, handling
+ * adds / partial closes / flips) and, at every tick, value it against the candle close — exactly
+ * how a real account's equity moves. Realized PnL still comes from the authoritative on-chain
+ * `closedPnl`; unrealized PnL is marked in the SAME normalized units by deriving `scale` from the
+ * peak fill notional (the identical factor challenge.ts used to scale closedPnl), so the realized
+ * and unrealized pieces are consistent and the curve is seamless across a close.
+ *
+ * Pure: same (ghost, candles, startEquity) -> same curve.
  */
-export function whaleCurve(ghost: GhostTrade[], startEquity: number, tickCount: number): SimPoint[] {
-  const pnlByTick = new Map<number, number>()
+export function whaleCurve(ghost: GhostTrade[], candles: Candle[], startEquity: number): SimPoint[] {
+  const tickCount = Math.max(0, candles.length - 1)
+  // same normalization factor challenge.ts applied to closedPnl: $startEquity per peak fill notional
+  const peakNotional = Math.max(1, ...ghost.map((g) => Math.abs(g.sz * g.px)))
+  const scale = startEquity / peakNotional
+
+  const byTick = new Map<number, GhostTrade[]>()
   for (const g of ghost) {
-    pnlByTick.set(g.tickIndex, (pnlByTick.get(g.tickIndex) ?? 0) + g.closedPnl)
+    const arr = byTick.get(g.tickIndex)
+    if (arr) arr.push(g)
+    else byTick.set(g.tickIndex, [g])
   }
+
+  let realized = 0
+  let q = 0 // signed position, coin units (+long / -short)
+  let entry = 0 // VWAP entry of the open exposure
   const curve: SimPoint[] = []
-  let cum = 0
+
   for (let tick = 0; tick <= tickCount; tick++) {
-    cum += pnlByTick.get(tick) ?? 0
-    curve.push({ tick, equity: startEquity + cum, price: 0 })
+    for (const g of byTick.get(tick) ?? []) {
+      realized += g.closedPnl // on-chain authoritative; nonzero only on closing fills
+      const signed = g.side === 'B' ? g.sz : -g.sz
+      const next = q + signed
+      if (q === 0 || q > 0 === signed > 0) {
+        // opening or adding in the same direction → volume-weight the entry
+        entry = next !== 0 ? (entry * q + g.px * signed) / next : g.px
+      } else if (next !== 0 && next > 0 !== q > 0) {
+        // flipped through zero → fresh entry at this fill
+        entry = g.px
+      } // else: reducing toward zero → entry unchanged (realized handled by closedPnl)
+      q = next
+    }
+    const price = candles[tick]?.c ?? 0
+    const unreal = q !== 0 ? q * (price - entry) * scale : 0
+    curve.push({ tick, equity: startEquity + realized + unreal, price })
   }
   return curve
 }

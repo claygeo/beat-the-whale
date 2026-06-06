@@ -30,21 +30,24 @@ export function sampleCandles(count = 120, start = 100, seed = 42): Candle[] {
   return out
 }
 
-/** A sample whale: long early, take profit, flip short, cover — a lively ghost to race. */
+/**
+ * A sample whale: long early, take profit, flip short, cover — a lively ghost to race.
+ * Size is chosen so the position notional ≈ the player's start equity (peak notional ≈ $10k,
+ * so scale ≈ 1), and realized PnL is derived from the real price move — keeping it consistent
+ * with whaleCurve's mark-to-market so the curve ramps smoothly instead of stepping.
+ */
 export function sampleGhost(candles: Candle[]): GhostTrade[] {
   if (candles.length < 91) return []
-  const at = (i: number, dir: string, side: 'B' | 'A', pnl: number): GhostTrade => ({
-    tickIndex: i,
-    side,
-    dir,
-    px: candles[i].c,
-    sz: 1,
-    closedPnl: pnl,
-  })
+  const SZ = 100 // @ price ~100 → ~$10k notional → scale ≈ 1
+  const longEntry = candles[10].c
+  const longExit = candles[45].c
+  const shortEntry = candles[60].c
+  const shortExit = candles[90].c
+  const r = (n: number) => Math.round(n)
   return [
-    at(10, 'Open Long', 'B', 0),
-    at(45, 'Close Long', 'A', 320),
-    at(60, 'Open Short', 'A', 0),
-    at(90, 'Close Short', 'B', -120),
+    { tickIndex: 10, side: 'B', dir: 'Open Long', px: longEntry, sz: SZ, closedPnl: 0 },
+    { tickIndex: 45, side: 'A', dir: 'Close Long', px: longExit, sz: SZ, closedPnl: r(SZ * (longExit - longEntry)) },
+    { tickIndex: 60, side: 'A', dir: 'Open Short', px: shortEntry, sz: SZ, closedPnl: 0 },
+    { tickIndex: 90, side: 'B', dir: 'Close Short', px: shortExit, sz: SZ, closedPnl: r(SZ * (shortEntry - shortExit)) },
   ]
 }

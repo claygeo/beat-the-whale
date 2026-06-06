@@ -66,12 +66,44 @@ describe('simulate', () => {
 })
 
 describe('whaleCurve', () => {
-  it('steps cumulative closedPnl at the fill ticks', () => {
+  it('steps cumulative closedPnl at the fill ticks (no open size to mark)', () => {
     const ghost: GhostTrade[] = [
       { tickIndex: 1, side: 'A', dir: null, px: 0, sz: 0, closedPnl: 50 },
       { tickIndex: 3, side: 'A', dir: null, px: 0, sz: 0, closedPnl: -20 },
     ]
-    const curve = whaleCurve(ghost, 10_000, 4)
+    const curve = whaleCurve(ghost, candles([100, 100, 100, 100, 100]), 10_000)
     expect(curve.map((p) => p.equity)).toEqual([10_000, 10_050, 10_050, 10_030, 10_030])
+  })
+
+  it('marks an open position to market each tick (no teleporting at the close)', () => {
+    // one fill: sz 10 @ px 100 → peak notional 1000 → scale = 10000/1000 = 10
+    const cs = candles([100, 110, 120])
+    const ghost: GhostTrade[] = [{ tickIndex: 0, side: 'B', dir: 'Open Long', px: 100, sz: 10, closedPnl: 0 }]
+    const curve = whaleCurve(ghost, cs, 10_000)
+    const scale = 10_000 / (10 * 100)
+    expect(curve.map((p) => p.equity)).toEqual([
+      10_000,
+      10_000 + 10 * (110 - 100) * scale,
+      10_000 + 10 * (120 - 100) * scale,
+    ])
+  })
+
+  it('converts unrealized to realized seamlessly on close', () => {
+    const cs = candles([100, 110, 110])
+    const ghost: GhostTrade[] = [
+      { tickIndex: 0, side: 'B', dir: 'Open Long', px: 100, sz: 10, closedPnl: 0 },
+      { tickIndex: 1, side: 'A', dir: 'Close Long', px: 110, sz: 10, closedPnl: 833 },
+    ]
+    const curve = whaleCurve(ghost, cs, 10_000)
+    // after the close the position is flat → equity holds at startEquity + realized
+    expect(curve[1].equity).toBeCloseTo(10_833, 6)
+    expect(curve[2].equity).toBeCloseTo(10_833, 6)
+  })
+
+  it('marks a short: equity rises as price falls', () => {
+    const cs = candles([100, 90])
+    const ghost: GhostTrade[] = [{ tickIndex: 0, side: 'A', dir: 'Open Short', px: 100, sz: 10, closedPnl: 0 }]
+    const curve = whaleCurve(ghost, cs, 10_000)
+    expect(curve[1].equity).toBeGreaterThan(curve[0].equity)
   })
 })

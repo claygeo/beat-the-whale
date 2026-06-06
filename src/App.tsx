@@ -43,8 +43,8 @@ export default function App() {
   const { candles, ghost } = active
   const tickCount = candles.length - 1
   const whaleEq = useMemo(
-    () => whaleCurve(ghost, active.startEquity, tickCount),
-    [ghost, active.startEquity, tickCount],
+    () => whaleCurve(ghost, candles, active.startEquity),
+    [ghost, candles, active.startEquity],
   )
 
   const [running, setRunning] = useState(false)
@@ -218,13 +218,14 @@ export default function App() {
         </div>
       )}
 
-      {/* replay progress */}
-      <div className="h-0.5 w-full shrink-0 bg-line">
-        <div
-          className="h-full bg-primary transition-[width] duration-200 ease-linear"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      {/* the race — who's ahead, live */}
+      <RaceLane
+        youPnl={youPnl}
+        whalePnl={whalePnl}
+        startEquity={active.startEquity}
+        pct={pct}
+        live={running && !done}
+      />
 
       <div className="relative min-h-0 flex-1">
         <CandleChart candles={candles} visibleTick={tick} markers={markers} />
@@ -329,6 +330,68 @@ function RaceChip({
     >
       {children}
     </button>
+  )
+}
+
+function RaceLane({
+  youPnl,
+  whalePnl,
+  startEquity,
+  pct,
+  live,
+}: {
+  youPnl: number
+  whalePnl: number
+  startEquity: number
+  pct: number
+  live: boolean
+}) {
+  // normalize PnL onto the track: breakeven = center, leader slides toward the finish
+  const ref = Math.max(Math.abs(youPnl), Math.abs(whalePnl), startEquity * 0.02)
+  const place = (v: number) => Math.max(6, Math.min(94, 50 + (v / ref) * 44))
+  const youX = place(youPnl)
+  const whaleX = place(whalePnl)
+  const youAhead = youPnl >= whalePnl
+  return (
+    <div className="shrink-0 border-b border-line bg-surface/30 px-3 py-2">
+      <div className="relative h-7 overflow-hidden rounded-md bg-bg/60 ring-1 ring-inset ring-line">
+        {/* time elapsed */}
+        <div
+          className="absolute inset-y-0 left-0 bg-primary/[0.06] transition-[width] duration-200 ease-linear"
+          style={{ width: `${pct}%` }}
+        />
+        {/* breakeven */}
+        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-line/70" />
+        {/* finish line */}
+        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] leading-none">🏁</span>
+        {/* you (upper lane) */}
+        <div
+          className="absolute top-0.5 -translate-x-1/2 transition-[left] duration-300 ease-out"
+          style={{ left: `${youX}%` }}
+        >
+          <span
+            className={`rounded-full bg-racer-you/20 px-1.5 py-px text-[9px] font-bold leading-tight text-racer-you ring-1 ring-inset ring-racer-you/50 ${
+              youAhead && live ? 'shadow-[0_0_8px_0] shadow-racer-you/50' : ''
+            }`}
+          >
+            You
+          </span>
+        </div>
+        {/* whale (lower lane) */}
+        <div
+          className="absolute bottom-0.5 -translate-x-1/2 transition-[left] duration-300 ease-out"
+          style={{ left: `${whaleX}%` }}
+        >
+          <span
+            className={`rounded-full bg-racer-whale/20 px-1.5 py-px text-[9px] font-bold leading-tight text-racer-whale ring-1 ring-inset ring-racer-whale/50 ${
+              !youAhead && live ? 'shadow-[0_0_8px_0] shadow-racer-whale/50' : ''
+            }`}
+          >
+            🐋
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -472,8 +535,8 @@ function RankedResult({
       <span className="text-xl font-bold tracking-tight text-ink">
         {beat ? 'You beat the whale 🎉' : 'The whale won 🐋'}
       </span>
-      <span className={`font-mono text-sm tabular-nums ${beat ? 'text-up' : 'text-down'}`}>
-        {beat ? '+' : '−'}${Math.abs(diff).toFixed(0)} vs the whale
+      <span className={`text-base font-semibold ${beat ? 'text-up' : 'text-down'}`}>
+        by <span className="font-mono tabular-nums">${Math.abs(diff).toFixed(0)}</span>
       </span>
 
       {board ? (
@@ -556,8 +619,8 @@ function ResultOverlay({
       <span className="text-2xl font-bold tracking-tight text-ink">
         {beat ? 'You beat the whale 🎉' : 'The whale won 🐋'}
       </span>
-      <span className={`font-mono text-sm tabular-nums ${beat ? 'text-up' : 'text-down'}`}>
-        {beat ? '+' : '−'}${Math.abs(diff).toFixed(0)} vs the whale
+      <span className={`text-base font-semibold ${beat ? 'text-up' : 'text-down'}`}>
+        by <span className="font-mono tabular-nums">${Math.abs(diff).toFixed(0)}</span>
       </span>
       <button
         onClick={onReplay}
