@@ -184,6 +184,7 @@ export default function App() {
       <div className="relative min-h-0 flex-1">
         <CandleChart candles={candles} visibleTick={tick} markers={markers} />
         {loading && <LoadingOverlay />}
+        {!running && !done && !loading && <StartHint />}
         {position && (
           <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-line bg-surface/80 px-2 py-1 font-mono text-[11px] tabular-nums backdrop-blur-sm">
             <span className={position.side === 'long' ? 'text-up' : 'text-down'}>
@@ -294,6 +295,21 @@ function Stepper({
       >
         +
       </button>
+    </div>
+  )
+}
+
+function StartHint() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-6 text-center">
+      <span className="text-4xl">🐋</span>
+      <span className="font-display text-lg font-bold text-ink">Race the whale&apos;s trades</span>
+      <span className="max-w-xs font-mono text-[11px] leading-relaxed text-ink-secondary">
+        The market replays from the start. Go long or short and beat the whale&apos;s PnL by the end.
+      </span>
+      <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-primary">
+        ▶ press play
+      </span>
     </div>
   )
 }
