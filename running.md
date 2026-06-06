@@ -11,14 +11,14 @@
 
 **Ranked architecture (codex-locked):** NO service-role key. (1) in-DB scoring via SECURITY DEFINER RPC (Postgres = authority); (2) ship-all-candles + UI-hide + one-shot/device (casual free leaderboard, not prize-grade); (3) pg_cron / manual-MCP freeze job. `submit_ranked_attempt` v1 applied (0002) — trusts client PnL within a bound + stores orders for audit.
 
-**▶ NEXT TASK — 🎯 TASTE / UX OVERHAUL (operator redirect 2026-06-06; TOP priority over remaining features).**
-Game is feature-complete but reads "AI-built / confusing." Make it premium, simple, FUN, mobile-first ("wow
-that was fun, I'll come back"). In order:
-1. **Typography** — kill mono-everywhere → clean Claude-chat sans (**Inter**) for text; mono ONLY for numbers (PnL/price).
-2. **Clarity / onboarding** — a real intro screen (what is this? the amber markers = the whale's *real* trades you're racing; how to play in 1 line) + declutter the header + whale-source bar (the 0x address search confuses newcomers — make it secondary/optional).
-3. **Game-feel + mobile-first polish** — juice, satisfying interactions, thumb-friendly controls; verify on 375px + X webview.
-Use gstack `/design-review` + `/qa-design-review`; `/deep-research` for premium mobile-game / trading-UI references.
-THEN **Phase 2 = SCENARIO/ARCADE spice mode** (the hireable differentiator — see DIRECTION block). Deferred below taste: share card, in-DB PnL recompute, pg_cron daily freeze.
+**▶ NEXT TASK — 🎯 TASTE OVERHAUL (operator redirect; cont'd).**
+✅ **Pass 1 DONE + live:** typography → **Inter** (mono only for numbers); header swept; redesigned clear intro ("Out-trade the whale" + explains the amber markers = the whale's real trades).
+✅ **Pass 2 DONE (verified mobile 375 + desktop, build clean, 0 console errors):** (a) **decluttered the whale-source bar** → premium rounded race-**chips** (🏆 Daily / BTC swing / WLD run / Sample, active highlighted) + the 0x wallet input hidden behind a **`+ Wallet`** toggle; (b) **full mono→Inter sweep** on all TEXT (chips, controls, result + leaderboard overlays, loading, steppers) — mono kept only on numbers; (c) **game-feel/juice** → replaced cryptic `012/027` counter with a slim **progress bar**, big thumb-friendly **Long/Short/Close** (rounded-xl, color-pop, `active:scale-95`), filled primary **Play**, `animate-pop-in` on result overlays + `animate-fade-in` on intro/wallet, `no-scrollbar` race row, `prefers-reduced-motion` respected.
+**NEXT:**
+1. **`/qa-design-review` polish pass** — audit mobile 375px + a simulated **X in-app webview** (narrow + short, safe-area) against DESIGN.md; tighten any spacing/contrast/touch-target nits; codex design sanity-check on the diff.
+2. THEN **Phase 2 = SCENARIO/ARCADE spice mode** (see 🎯 DIRECTION block) — flash/slow crash + fast/slow pump RNG events + speed mode + high-TPS, kept SEPARATE from whale-replay (synthetic path + reactive bot).
+Deferred: share card, in-DB PnL recompute, pg_cron daily freeze.
+**Preview note:** server id `300a3ece-…` (port 5202). If the renderer goes flaky → `preview_stop` + `preview_start` for a fresh one. `footer button` clicks don't register the React handler — start/trade via `preview_eval` (find button by textContent).
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 

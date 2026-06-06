@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { CandleChart, type WhaleMarker } from './components/CandleChart'
 import { EquityChart } from './components/EquityChart'
 import { useReplayClock } from './hooks/useReplayClock'
@@ -36,6 +36,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [address, setAddress] = useState('')
   const [rankedId, setRankedId] = useState<string | null>(null)
+  const [source, setSource] = useState<string>('sample')
+  const [showWallet, setShowWallet] = useState(false)
 
   const active: Active = challenge ?? sample
   const { candles, ghost } = active
@@ -57,6 +59,7 @@ export default function App() {
   )
   const tick = useReplayClock({ running, msPerTick, tickCount, runKey })
   const done = running && tick >= tickCount
+  const pct = tickCount > 0 ? (Math.min(tick, tickCount) / tickCount) * 100 : 0
 
   const playerSim = useMemo(
     () => simulate(candles, orders, active.startEquity, tick),
@@ -100,6 +103,8 @@ export default function App() {
       const c = await buildChallengeFromWallet(addr, label ? { label } : {})
       setChallenge(c)
       setRankedId(null)
+      setSource(addr.toLowerCase())
+      setShowWallet(false)
       resetGame()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load wallet.')
@@ -119,6 +124,7 @@ export default function App() {
       }
       setChallenge(d)
       setRankedId(d.challengeId)
+      setSource('daily')
       resetGame()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load daily challenge.')
@@ -129,6 +135,7 @@ export default function App() {
   const useSample = () => {
     setChallenge(null)
     setRankedId(null)
+    setSource('sample')
     setError(null)
     resetGame()
   }
@@ -145,88 +152,92 @@ export default function App() {
 
   return (
     <main className="flex h-dvh flex-col bg-bg">
-      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
+      <header className="flex items-center justify-between gap-2 border-b border-line px-3.5 py-2.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="text-base" role="img" aria-label="whale">
             🐋
           </span>
-          <span className="whitespace-nowrap font-display text-sm font-bold tracking-tight text-ink">
+          <span className="whitespace-nowrap text-sm font-bold tracking-tight text-ink">
             Beat the Whale
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-2.5 text-[11px] sm:gap-4">
-          <Pnl label="you" value={youPnl} className="text-racer-you" />
-          <Pnl label="whale" value={whalePnl} className="text-racer-whale" />
-          <span className="font-mono tabular-nums text-ink-muted">
-            {String(tick).padStart(3, '0')}/{tickCount}
-          </span>
+        <div className="flex shrink-0 items-center gap-3 text-[11px] sm:gap-4">
+          <Pnl label="You" value={youPnl} className="text-racer-you" />
+          <Pnl label="Whale" value={whalePnl} className="text-racer-whale" />
         </div>
       </header>
 
-      {/* whale source bar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-line px-3 py-1.5">
-        <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted">
-          {rankedId ? '🏆 ranked' : 'racing'}
-        </span>
-        <span className="whitespace-nowrap font-mono text-[11px] text-ink">
-          {active.label}
-          {active.coin !== 'SAMPLE' && <span className="text-ink-secondary"> · {active.coin}</span>}
-        </span>
-        <span className="mx-1 h-3 w-px shrink-0 bg-line" />
-        <button
-          onClick={loadDaily}
-          disabled={loading}
-          className="shrink-0 whitespace-nowrap rounded-sm border border-warn/40 bg-warn/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.05em] text-warn transition-colors hover:bg-warn/20 disabled:opacity-50"
-        >
-          🏆 daily
-        </button>
+      {/* race selector — pick who you're up against */}
+      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto border-b border-line px-3 py-2">
+        <RaceChip active={source === 'daily'} onClick={loadDaily} disabled={loading} accent="warn">
+          🏆 Daily
+        </RaceChip>
         {FEATURED_WHALES.map((w) => (
-          <button
+          <RaceChip
             key={w.address}
+            active={source === w.address.toLowerCase()}
             onClick={() => loadWhale(w.address, w.label)}
             disabled={loading}
-            className="whitespace-nowrap rounded-sm border border-line px-2 py-0.5 font-mono text-[10px] text-ink-secondary transition-colors hover:border-racer-whale/50 hover:text-ink disabled:opacity-50"
           >
             {w.label}
-          </button>
+          </RaceChip>
         ))}
-        <input
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && loadWhale(address)}
-          placeholder="0x wallet…"
-          spellCheck={false}
-          className="w-28 shrink-0 rounded-sm border border-line bg-surface px-2 py-0.5 font-mono text-[10px] text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
-        />
-        <button
-          onClick={() => loadWhale(address)}
-          disabled={loading}
-          className="shrink-0 rounded-sm border border-primary-muted bg-primary-muted/40 px-2 py-0.5 font-mono text-[10px] uppercase text-primary transition-colors hover:bg-primary-muted/60 disabled:opacity-50"
-        >
-          race
-        </button>
-        {challenge && (
+        <RaceChip active={source === 'sample'} onClick={useSample} disabled={loading}>
+          Sample
+        </RaceChip>
+        <span className="mx-0.5 h-4 w-px shrink-0 bg-line" />
+        <RaceChip active={showWallet} onClick={() => setShowWallet((v) => !v)} disabled={loading}>
+          + Wallet
+        </RaceChip>
+      </div>
+
+      {showWallet && (
+        <div className="flex items-center gap-2 border-b border-line px-3 py-2 animate-fade-in">
+          <input
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && loadWhale(address)}
+            placeholder="Paste any 0x wallet…"
+            spellCheck={false}
+            autoFocus
+            className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-ink placeholder:font-sans placeholder:text-ink-muted focus:border-primary focus:outline-none"
+          />
           <button
-            onClick={useSample}
-            className="shrink-0 whitespace-nowrap rounded-sm border border-line px-2 py-0.5 font-mono text-[10px] text-ink-muted transition-colors hover:text-ink"
+            onClick={() => loadWhale(address)}
+            disabled={loading || address.trim().length < 4}
+            className="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-bg transition-all active:scale-95 hover:bg-primary/90 disabled:opacity-40"
           >
-            sample
+            Race
           </button>
-        )}
-        {loading && <span className="shrink-0 font-mono text-[10px] text-ink-secondary">loading…</span>}
-        {error && <span className="shrink-0 whitespace-nowrap font-mono text-[10px] text-down">{error}</span>}
+        </div>
+      )}
+
+      {error && (
+        <div className="border-b border-down/20 bg-down/10 px-3.5 py-1.5 text-[11px] text-down animate-fade-in">
+          {error}
+        </div>
+      )}
+
+      {/* replay progress */}
+      <div className="h-0.5 w-full shrink-0 bg-line">
+        <div
+          className="h-full bg-primary transition-[width] duration-200 ease-linear"
+          style={{ width: `${pct}%` }}
+        />
       </div>
 
       <div className="relative min-h-0 flex-1">
         <CandleChart candles={candles} visibleTick={tick} markers={markers} />
         {loading && <LoadingOverlay />}
-        {!running && !done && !loading && <StartHint />}
+        {!running && !done && !loading && <StartHint label={active.label} coin={active.coin} />}
         {position && (
-          <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-line bg-surface/80 px-2 py-1 font-mono text-[11px] tabular-nums backdrop-blur-sm">
-            <span className={position.side === 'long' ? 'text-up' : 'text-down'}>
-              {position.side.toUpperCase()}
-            </span>{' '}
-            <span className="text-ink-secondary">${position.size.toLocaleString()}</span>
+          <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-lg border border-line bg-surface/85 px-2.5 py-1 text-[11px] backdrop-blur-sm">
+            <span className={`font-semibold ${position.side === 'long' ? 'text-up' : 'text-down'}`}>
+              {position.side === 'long' ? 'Long' : 'Short'}
+            </span>
+            <span className="font-mono tabular-nums text-ink-secondary">
+              ${position.size.toLocaleString()}
+            </span>
           </div>
         )}
         {done &&
@@ -243,46 +254,46 @@ export default function App() {
       </div>
 
       <div className="relative h-[20vh] min-h-[110px] border-t border-line">
-        <div className="pointer-events-none absolute left-3 top-2 z-10 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted">
-          equity race
+        <div className="pointer-events-none absolute left-3 top-2 z-10 text-[10px] font-medium uppercase tracking-wide text-ink-muted">
+          Equity race
         </div>
         <EquityChart you={playerSim.curve} whale={whaleVisible} />
       </div>
 
       {!done && (
-        <footer className="border-t border-line px-4 py-3">
+        <footer className="border-t border-line px-3.5 py-3">
           {!running ? (
             <button
               onClick={start}
-              className="w-full rounded-md border border-primary-muted bg-primary-muted/40 py-2.5 font-mono text-xs uppercase tracking-[0.1em] text-primary transition-colors hover:bg-primary-muted/60"
+              className="w-full rounded-xl bg-primary py-3.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90"
             >
-              ▶ play
+              ▶ Play
             </button>
           ) : (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
               <div className="flex flex-1 gap-2">
                 <button
                   onClick={() => place('open_long')}
-                  className="flex-1 rounded-md border border-up/30 bg-up/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-up transition-colors hover:bg-up/20"
+                  className="flex-1 rounded-xl border border-up/40 bg-up/15 py-3.5 text-sm font-semibold text-up transition-all active:scale-95 hover:bg-up/25"
                 >
-                  long
+                  Long
                 </button>
                 <button
                   onClick={() => place('open_short')}
-                  className="flex-1 rounded-md border border-down/30 bg-down/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-down transition-colors hover:bg-down/20"
+                  className="flex-1 rounded-xl border border-down/40 bg-down/15 py-3.5 text-sm font-semibold text-down transition-all active:scale-95 hover:bg-down/25"
                 >
-                  short
+                  Short
                 </button>
                 <button
                   onClick={() => place('close')}
-                  className="flex-1 rounded-md border border-line py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-ink-secondary transition-colors hover:bg-surface-hover"
+                  className="flex-1 rounded-xl border border-line bg-surface py-3.5 text-sm font-semibold text-ink-secondary transition-all active:scale-95 hover:bg-surface-hover hover:text-ink"
                 >
-                  close
+                  Close
                 </button>
               </div>
-              <div className="flex items-center justify-center gap-1.5 sm:justify-end">
-                <Stepper label="size" value={size} onChange={setSize} step={500} prefix="$" />
-                <Stepper label="lev" value={leverage} onChange={setLeverage} step={1} suffix="x" />
+              <div className="flex items-center justify-center gap-2 sm:justify-end">
+                <Stepper label="Size" value={size} onChange={setSize} step={500} prefix="$" />
+                <Stepper label="Lev" value={leverage} onChange={setLeverage} step={1} suffix="x" />
               </div>
             </div>
           )}
@@ -292,12 +303,41 @@ export default function App() {
   )
 }
 
+function RaceChip({
+  active,
+  onClick,
+  disabled,
+  accent = 'default',
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  disabled?: boolean
+  accent?: 'warn' | 'default'
+  children: ReactNode
+}) {
+  const ring = active
+    ? accent === 'warn'
+      ? 'bg-warn/15 text-warn ring-1 ring-inset ring-warn/40'
+      : 'bg-primary/15 text-primary ring-1 ring-inset ring-primary/40'
+    : 'text-ink-secondary ring-1 ring-inset ring-line hover:text-ink hover:ring-line-hover'
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all active:scale-95 disabled:opacity-40 ${ring}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 function Pnl({ label, value, className }: { label: string; value: number; className: string }) {
   const sign = value >= 0 ? '+' : '−'
   return (
     <span className="flex items-center gap-1">
       <span className="text-ink-muted">{label}</span>
-      <span className={`font-mono tabular-nums ${className}`}>
+      <span className={`font-mono font-medium tabular-nums ${className}`}>
         {sign}${Math.abs(value).toFixed(0)}
       </span>
     </span>
@@ -320,11 +360,13 @@ function Stepper({
   suffix?: string
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-md border border-line px-1.5 py-1">
-      <span className="hidden font-mono text-[10px] uppercase text-ink-muted sm:inline">{label}</span>
+    <div className="flex items-center gap-1 rounded-lg border border-line px-1.5 py-1">
+      <span className="hidden text-[10px] font-medium uppercase tracking-wide text-ink-muted sm:inline">
+        {label}
+      </span>
       <button
         onClick={() => onChange(Math.max(step, value - step))}
-        className="px-1 font-mono text-ink-secondary transition-colors hover:text-ink"
+        className="px-1.5 text-ink-secondary transition-all active:scale-90 hover:text-ink"
         aria-label={`decrease ${label}`}
       >
         −
@@ -336,7 +378,7 @@ function Stepper({
       </span>
       <button
         onClick={() => onChange(value + step)}
-        className="px-1 font-mono text-ink-secondary transition-colors hover:text-ink"
+        className="px-1.5 text-ink-secondary transition-all active:scale-90 hover:text-ink"
         aria-label={`increase ${label}`}
       >
         +
@@ -345,19 +387,22 @@ function Stepper({
   )
 }
 
-function StartHint() {
+function StartHint({ label, coin }: { label: string; coin: string }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg/75 px-8 text-center backdrop-blur-[2px]">
+    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg/75 px-8 text-center backdrop-blur-[2px] animate-fade-in">
       <span className="text-5xl">🐋</span>
-      <span className="font-display text-xl font-bold tracking-tight text-ink">
-        Out-trade the whale
-      </span>
+      <span className="text-xl font-bold tracking-tight text-ink">Out-trade the whale</span>
       <p className="max-w-[18rem] text-[13px] leading-relaxed text-ink-secondary">
         A real trader&apos;s moves replay on this chart. Go long or short with paper money and beat
         their PnL by the end — their actual trades appear as{' '}
         <span className="font-semibold text-racer-whale">amber markers</span>.
       </p>
-      <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-primary-muted bg-primary-muted/30 px-3.5 py-1.5 text-xs font-semibold text-primary">
+      {coin !== 'SAMPLE' && (
+        <span className="text-[11px] text-ink-muted">
+          Now racing · <span className="text-ink-secondary">{label}</span>
+        </span>
+      )}
+      <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-bg">
         ▶ Press play to start
       </span>
     </div>
@@ -370,9 +415,7 @@ function LoadingOverlay() {
       <span className="animate-pulse text-3xl" role="img" aria-label="whale">
         🐋
       </span>
-      <span className="font-mono text-xs uppercase tracking-[0.1em] text-ink-secondary">
-        loading the whale&apos;s trades…
-      </span>
+      <span className="text-xs font-medium text-ink-secondary">Loading the whale&apos;s trades…</span>
     </div>
   )
 }
@@ -425,8 +468,8 @@ function RankedResult({
   }
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-bg/90 px-6 py-6 text-center backdrop-blur-sm">
-      <span className="font-display text-xl font-bold tracking-tight text-ink">
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-bg/90 px-6 py-6 text-center backdrop-blur-sm animate-pop-in">
+      <span className="text-xl font-bold tracking-tight text-ink">
         {beat ? 'You beat the whale 🎉' : 'The whale won 🐋'}
       </span>
       <span className={`font-mono text-sm tabular-nums ${beat ? 'text-up' : 'text-down'}`}>
@@ -436,34 +479,34 @@ function RankedResult({
       {board ? (
         <div className="w-full max-w-sm">
           {result && (
-            <div className="mb-2 font-mono text-xs uppercase tracking-[0.1em] text-primary">
-              you ranked #{result.leaderboard_rank}
+            <div className="mb-2 text-xs font-semibold text-primary">
+              You ranked #{result.leaderboard_rank}
             </div>
           )}
-          <div className="rounded-md border border-line text-left">
-            <div className="flex items-center justify-between border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted">
-              <span>today&apos;s leaderboard</span>
-              <span>pnl</span>
+          <div className="rounded-xl border border-line text-left">
+            <div className="flex items-center justify-between border-b border-line px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-ink-muted">
+              <span>Today&apos;s leaderboard</span>
+              <span>PnL</span>
             </div>
             <div className="max-h-52 overflow-y-auto">
               {board.length === 0 ? (
-                <div className="px-3 py-2 font-mono text-[11px] text-ink-muted">
-                  be the first to post a score
-                </div>
+                <div className="px-3 py-2 text-[11px] text-ink-muted">Be the first to post a score</div>
               ) : (
                 board.map((row) => (
                   <div
                     key={`${row.leaderboard_rank}-${row.handle}`}
-                    className="flex items-center justify-between px-3 py-1.5 font-mono text-[11px] tabular-nums"
+                    className="flex items-center justify-between px-3 py-1.5 text-[12px]"
                   >
                     <span className="flex items-center gap-2 truncate">
-                      <span className="w-5 shrink-0 text-right text-ink-muted">
+                      <span className="w-5 shrink-0 text-right font-mono tabular-nums text-ink-muted">
                         {row.leaderboard_rank}
                       </span>
                       <span className="truncate text-ink">{row.handle}</span>
                       {row.beat_whale && <span className="text-[9px]">🐋</span>}
                     </span>
-                    <span className={row.final_pnl >= 0 ? 'text-up' : 'text-down'}>
+                    <span
+                      className={`font-mono tabular-nums ${row.final_pnl >= 0 ? 'text-up' : 'text-down'}`}
+                    >
                       {row.final_pnl >= 0 ? '+' : '−'}${Math.abs(row.final_pnl).toFixed(0)}
                     </span>
                   </div>
@@ -471,7 +514,7 @@ function RankedResult({
               )}
             </div>
           </div>
-          {error && <span className="mt-2 block font-mono text-[11px] text-warn">{error}</span>}
+          {error && <span className="mt-2 block text-[11px] text-warn">{error}</span>}
         </div>
       ) : (
         <div className="flex w-full max-w-xs flex-col items-center gap-2">
@@ -479,18 +522,18 @@ function RankedResult({
             value={handle}
             onChange={(e) => setHandle(e.target.value.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 24))}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
-            placeholder="your handle"
+            placeholder="Your handle"
             spellCheck={false}
-            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-center font-mono text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-center text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
           />
           <button
             onClick={submit}
             disabled={submitting || handle.trim().length < 1}
-            className="w-full rounded-md border border-primary-muted bg-primary-muted/40 py-2 font-mono text-xs uppercase tracking-[0.1em] text-primary transition-colors hover:bg-primary-muted/60 disabled:opacity-40"
+            className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-40"
           >
-            {submitting ? 'submitting…' : 'submit score'}
+            {submitting ? 'Submitting…' : 'Submit score'}
           </button>
-          {error && <span className="font-mono text-[11px] text-down">{error}</span>}
+          {error && <span className="text-[11px] text-down">{error}</span>}
         </div>
       )}
     </div>
@@ -509,8 +552,8 @@ function ResultOverlay({
   const beat = youPnl > whalePnl
   const diff = youPnl - whalePnl
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg/85 px-6 text-center backdrop-blur-sm">
-      <span className="font-display text-2xl font-bold tracking-tight text-ink">
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg/85 px-6 text-center backdrop-blur-sm animate-pop-in">
+      <span className="text-2xl font-bold tracking-tight text-ink">
         {beat ? 'You beat the whale 🎉' : 'The whale won 🐋'}
       </span>
       <span className={`font-mono text-sm tabular-nums ${beat ? 'text-up' : 'text-down'}`}>
@@ -518,9 +561,9 @@ function ResultOverlay({
       </span>
       <button
         onClick={onReplay}
-        className="mt-1 rounded-md border border-primary-muted bg-primary-muted/40 px-5 py-2 font-mono text-xs uppercase tracking-[0.1em] text-primary transition-colors hover:bg-primary-muted/60"
+        className="mt-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90"
       >
-        play again
+        Play again
       </button>
     </div>
   )
