@@ -9,7 +9,7 @@
 
 **Iteration protocol:** (1) read this file → (2) do the **NEXT TASK** → (3) verify (build / test / preview) → (4) commit + push — ALWAYS strip the auto-injected `geobridge` dep from package.json first (atomic strip+commit) → (5) check off the task + set a new NEXT TASK → (6) continue.
 
-**▶ NEXT TASK:** Free-play game UI — chart component (lightweight-charts) rendering HL candles with deterministic replay playback (fed by `src/lib/hyperliquid.ts` + `tickAtElapsed`). Then ghost markers, dual equity curves, paper-trade controls. Free-play needs no backend (pure client vs HL API) → fastest path to deployable + QA-able.
+**▶ NEXT TASK:** Free-play, wire the real game on top of the verified chart: (a) fetch a real HL coin's candles + a known whale's fills live (replace sample data), (b) render whale ghost entry/exit markers on the chart, (c) dual equity curves (you vs whale, from `simulate` / `whaleCurve`), (d) paper-trade controls (long/short/close + size + leverage). Then deploy to Netlify.
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
@@ -62,7 +62,8 @@ global leaderboard, plus unranked free-play.
 - [x] HL data layer (candles, whale fills, closedPnl) + types
 - [x] Replay engine built + compiles (`src/lib/replay.ts`): deterministic clock + paper sim + whale ghost curve
 - [x] Replay engine unit tests — 7 passing (PnL long/short, liquidation, close-realization, determinism, whale curve)
-- [ ] Wire engine → chart UI
+- [x] Chart renders + deterministic replay playback (lightweight-charts) — verified live, 0 console errors
+- [ ] Wire sim → dual equity curves + ghost markers + paper-trade controls
 - [ ] Chart + whale ghost markers
 - [ ] Paper execution (long/short, size, leverage, fees/slippage)
 - [ ] Dual live equity curves (you vs whale)
