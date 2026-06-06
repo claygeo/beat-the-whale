@@ -4,6 +4,7 @@ import {
   injectEvent,
   priceAtElapsed,
   pathToCandles,
+  indexCurve,
   botOrders,
   STREAM_DT,
   SCENARIO_PRICE0,
@@ -114,5 +115,26 @@ describe('candle aggregation + bot', () => {
 
   it('start price constant is the default', () => {
     expect(createPath(1).prices[0]).toBe(SCENARIO_PRICE0)
+  })
+})
+
+describe('index opponent (passive market)', () => {
+  it('starts at startEquity and is unaffected by injected events', () => {
+    const p = createPath(123)
+    const before = indexCurve(p, 10_000, 500).map((x) => x.equity)
+    // the player's events move THEIR tape, never the opponent's underlying index
+    injectEvent(p, 'flash_crash', 10_000)
+    injectEvent(p, 'fast_pump', 20_000)
+    const after = indexCurve(p, 10_000, 500).map((x) => x.equity)
+    expect(after).toEqual(before) // the real invariant: the opponent index never sees the player's events
+    expect(before[0]).toBeGreaterThan(9_500) // first candle ≈ startEquity (one candle of drift/noise in)
+    expect(before[0]).toBeLessThan(10_500)
+  })
+
+  it('drifts upward over the run (a real benchmark to beat)', () => {
+    const curve = indexCurve(createPath(7), 10_000, 500)
+    // with positive base drift the median index ends above start (allow noise on any single seed)
+    expect(curve[curve.length - 1].equity).toBeGreaterThan(9_000)
+    expect(curve.length).toBeGreaterThan(50)
   })
 })

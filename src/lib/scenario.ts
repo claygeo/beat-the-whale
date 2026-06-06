@@ -18,6 +18,9 @@ export const STREAM_HZ = 40
 export const STREAM_DT = 1000 / STREAM_HZ // 25 ms per sub-tick — the "high TPS" stream
 export const SCENARIO_PRICE0 = 100
 export const SCENARIO_LENGTH_MS = 60_000
+// a gentle up-drift so the passive opponent index visibly TRENDS up (a real benchmark to beat):
+// doing nothing loses to a rising market; you win by actively trading + manufacturing events.
+export const SCENARIO_DRIFT = 0.00002
 
 export interface ScenarioBand {
   key: ScenarioKey
@@ -73,7 +76,8 @@ export interface ScenarioPath {
   baseDrift: number
   baseVol: number
   events: ScenarioEvent[]
-  prices: number[] // cumulative sub-tick prices — the source of truth
+  prices: number[] // cumulative sub-tick prices WITH events — the visible tape the player trades
+  basePrices: number[] // the event-free underlying — what the passive opponent index holds
 }
 
 /**
@@ -125,10 +129,16 @@ function recompute(path: ScenarioPath, from: number): void {
 }
 
 /** A fresh scenario path: seeded noisy walk, no events yet. */
-export function createPath(seed: number, price0 = SCENARIO_PRICE0, lengthMs = SCENARIO_LENGTH_MS): ScenarioPath {
+export function createPath(
+  seed: number,
+  price0 = SCENARIO_PRICE0,
+  lengthMs = SCENARIO_LENGTH_MS,
+  drift = SCENARIO_DRIFT,
+): ScenarioPath {
   const n = Math.ceil(lengthMs / STREAM_DT) + 1
-  const path: ScenarioPath = { seed: seed >>> 0, price0, baseDrift: 0, baseVol: 0.0005, events: [], prices: new Array(n).fill(price0) }
+  const path: ScenarioPath = { seed: seed >>> 0, price0, baseDrift: drift, baseVol: 0.0005, events: [], prices: new Array(n).fill(price0), basePrices: [] }
   recompute(path, 0)
+  path.basePrices = path.prices.slice() // snapshot the event-free market the opponent index holds
   return path
 }
 
@@ -185,7 +195,29 @@ export function pathToCandles(path: ScenarioPath, candleMs = 1000, uptoMs?: numb
   return candles
 }
 
-// ----------------------------- the ghost bot opponent -----------------------------
+// ----------------------------- the opponent: passive market index -----------------------------
+
+/**
+ * The Arcade opponent (codex pick C): a passive 1× HODL of the UNDERLYING, event-free market —
+ * startEquity scaled by the base price. The player's injected crash/pump events move the visible
+ * tape they trade but NOT this index, so events are a pure player weapon (never free alpha for the
+ * opponent) and the skill becomes timing + direction + event sequencing, not out-sizing a bot.
+ * Returns one point per chart candle, aligned with pathToCandles(candleMs).
+ */
+export function indexCurve(path: ScenarioPath, startEquity: number, candleMs = 1000): SimPoint[] {
+  const perCandle = Math.max(1, Math.round(candleMs / STREAM_DT))
+  const base = path.basePrices.length ? path.basePrices : path.prices
+  const base0 = base[0] || 1
+  const curve: SimPoint[] = []
+  for (let start = 0, ci = 0; start < base.length; start += perCandle, ci++) {
+    const end = Math.min(base.length - 1, start + perCandle - 1)
+    const p = base[end]
+    curve.push({ tick: ci, equity: startEquity * (p / base0), price: p })
+  }
+  return curve
+}
+
+// ----------------------------- (legacy) momentum ghost bot -----------------------------
 
 /**
  * A deterministic momentum opponent over the synthetic candles: ride the last-`look`-candle trend,

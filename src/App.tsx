@@ -10,8 +10,7 @@ import {
   createPath,
   injectEvent,
   pathToCandles,
-  botOrders,
-  botCurve,
+  indexCurve,
   type ScenarioKey,
   type ScenarioPath,
 } from './lib/scenario'
@@ -27,8 +26,6 @@ import type { Candle } from './lib/hyperliquid'
 const TARGET_REPLAY_MS = 60_000
 const START_EQUITY = 10_000
 const SCENARIO_CANDLE_MS = 500
-const BOT_SIZE = 3_000
-const BOT_LEV = 3
 
 type Mode = 'replay' | 'scenario'
 
@@ -84,16 +81,11 @@ export default function App() {
     () => (isScenario ? [] : whaleCurve(active.ghost, active.candles, active.startEquity)),
     [isScenario, active],
   )
-  const botOrdersList = useMemo(
-    () => (isScenario && scenarioCandles.length ? botOrders(scenarioCandles, BOT_SIZE, BOT_LEV) : []),
-    [isScenario, scenarioCandles],
-  )
-  const botEq = useMemo(
-    () =>
-      isScenario && scenarioCandles.length
-        ? botCurve(scenarioCandles, startEquity, BOT_SIZE, BOT_LEV, tickCount)
-        : [],
-    [isScenario, scenarioCandles, startEquity, tickCount],
+  // Arcade opponent: a passive HODL of the event-free underlying (rising market) — the player's
+  // injected events move their tape but not this index, so events are pure player advantage.
+  const indexEq = useMemo(
+    () => (isScenario && scenarioPath ? indexCurve(scenarioPath, startEquity, SCENARIO_CANDLE_MS) : []),
+    [isScenario, scenarioPath, startEquity],
   )
 
   const msPerTick = useMemo(() => {
@@ -121,7 +113,7 @@ export default function App() {
     return p
   }, [orders, tick])
 
-  const oppCurve = isScenario ? botEq : whaleEq
+  const oppCurve = isScenario ? indexEq : whaleEq
   const youPnl = playerSim.finalEquity - startEquity
   const oppPnl = (oppCurve[Math.min(tick, tickCount)]?.equity ?? startEquity) - startEquity
   const oppVisible = oppCurve.slice(0, tick + 1)
@@ -206,15 +198,9 @@ export default function App() {
     resetGame()
   }
 
+  // replay shows the whale's real trades as ghost markers; arcade has no opponent trades (passive index)
   const markers: WhaleMarker[] = isScenario
-    ? botOrdersList
-        .filter((o) => o.tick <= tick && scenarioCandles[o.tick])
-        .map((o) => ({
-          time: Math.floor(scenarioCandles[o.tick].t / 1000),
-          aboveBar: o.action === 'open_short',
-          up: o.action === 'open_long',
-          text: o.action === 'open_long' ? 'Bot Long' : 'Bot Short',
-        }))
+    ? []
     : active.ghost
         .filter((g) => g.tickIndex <= tick)
         .map((g) => ({
@@ -254,7 +240,7 @@ export default function App() {
         </div>
         <div className="flex shrink-0 items-center gap-3 text-[11px] sm:gap-4">
           <Pnl label="You" value={youPnl} className="text-racer-you" />
-          <Pnl label={isScenario ? 'Bot' : 'Whale'} value={oppPnl} className="text-racer-whale" />
+          <Pnl label={isScenario ? 'Market' : 'Whale'} value={oppPnl} className="text-racer-whale" />
         </div>
       </header>
 
@@ -342,7 +328,7 @@ export default function App() {
       )}
 
       {/* the race — who's ahead, live */}
-      <RaceLane youPnl={youPnl} oppPnl={oppPnl} oppEmoji={isScenario ? '🤖' : '🐋'} startEquity={startEquity} pct={pct} live={running && !done} />
+      <RaceLane youPnl={youPnl} oppPnl={oppPnl} oppEmoji={isScenario ? '📊' : '🐋'} startEquity={startEquity} pct={pct} live={running && !done} />
 
       <div className="relative min-h-0 flex-1">
         <CandleChart candles={gameCandles} visibleTick={tick} markers={markers} />
@@ -362,7 +348,7 @@ export default function App() {
           (!isScenario && rankedId ? (
             <RankedResult challengeId={rankedId} youPnl={youPnl} whalePnl={oppPnl} orders={orders} />
           ) : (
-            <ResultOverlay youPnl={youPnl} oppPnl={oppPnl} opponent={isScenario ? 'bot' : 'whale'} onReplay={start} />
+            <ResultOverlay youPnl={youPnl} oppPnl={oppPnl} opponent={isScenario ? 'market' : 'whale'} onReplay={start} />
           ))}
       </div>
 
@@ -571,12 +557,11 @@ function StartHint({ mode, label, coin }: { mode: Mode; label: string; coin: str
         <span className="text-5xl">🎮</span>
         <span className="text-xl font-bold tracking-tight text-ink">Trade the chaos</span>
         <p className="max-w-[19rem] text-[13px] leading-relaxed text-ink-secondary">
-          A live synthetic market vs a momentum{' '}
-          <span className="font-semibold text-racer-whale">bot</span>. The edge: take a position{' '}
-          <span className="italic">first</span>, then slam{' '}
+          The <span className="font-semibold text-racer-whale">📊 Market</span> just holds and drifts
+          up — your job is to beat it. Take a position, then slam{' '}
           <span className="font-semibold text-down">⚡ crash</span> /{' '}
-          <span className="font-semibold text-up">🚀 pump</span> to swing the market your way — random
-          size + timing every run. Beat the bot&apos;s PnL by the end.
+          <span className="font-semibold text-up">🚀 pump</span> to manufacture your own moves (random
+          size + timing every run). Your events swing your tape, not the Market&apos;s.
         </p>
         <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-bg">
           ▶ Press play to start
@@ -744,12 +729,12 @@ function ResultOverlay({
 }: {
   youPnl: number
   oppPnl: number
-  opponent: 'whale' | 'bot'
+  opponent: 'whale' | 'market'
   onReplay: () => void
 }) {
   const beat = youPnl > oppPnl
   const diff = youPnl - oppPnl
-  const oppEmoji = opponent === 'bot' ? '🤖' : '🐋'
+  const oppEmoji = opponent === 'market' ? '📊' : '🐋'
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg/85 px-6 text-center backdrop-blur-sm animate-pop-in">
       <span className="text-2xl font-bold tracking-tight text-ink">
@@ -762,7 +747,7 @@ function ResultOverlay({
         onClick={onReplay}
         className="mt-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-bg transition-all active:scale-[0.98] hover:bg-primary/90"
       >
-        {opponent === 'bot' ? 'New run' : 'Play again'}
+        {opponent === 'market' ? 'New run' : 'Play again'}
       </button>
     </div>
   )
