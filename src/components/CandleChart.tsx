@@ -5,12 +5,29 @@ import {
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
+  type SeriesMarker,
   type UTCTimestamp,
 } from 'lightweight-charts'
 import type { Candle } from '../lib/hyperliquid'
 
+/** A whale ghost marker (entry/exit), decoupled from lightweight-charts' types. */
+export interface WhaleMarker {
+  time: number
+  aboveBar: boolean
+  up: boolean
+  text: string
+}
+
 /** Premium dark candlestick chart (GeoBridge palette). Reveals candles up to `visibleTick`. */
-export function CandleChart({ candles, visibleTick }: { candles: Candle[]; visibleTick: number }) {
+export function CandleChart({
+  candles,
+  visibleTick,
+  markers = [],
+}: {
+  candles: Candle[]
+  visibleTick: number
+  markers?: WhaleMarker[]
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -60,6 +77,19 @@ export function CandleChart({ candles, visibleTick }: { candles: Candle[]; visib
     }))
     series.setData(data)
   }, [candles, visibleTick])
+
+  useEffect(() => {
+    const series = seriesRef.current
+    if (!series) return
+    const m: SeriesMarker<UTCTimestamp>[] = markers.map((x) => ({
+      time: x.time as UTCTimestamp,
+      position: x.aboveBar ? 'aboveBar' : 'belowBar',
+      color: '#fbbf24',
+      shape: x.up ? 'arrowUp' : 'arrowDown',
+      text: x.text,
+    }))
+    series.setMarkers(m)
+  }, [markers])
 
   return <div ref={containerRef} className="h-full w-full" />
 }

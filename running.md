@@ -9,7 +9,7 @@
 
 **Iteration protocol:** (1) read this file → (2) do the **NEXT TASK** → (3) verify (build / test / preview) → (4) commit + push — ALWAYS strip the auto-injected `geobridge` dep from package.json first (atomic strip+commit) → (5) check off the task + set a new NEXT TASK → (6) continue.
 
-**▶ NEXT TASK:** Free-play, wire the real game on top of the verified chart: (a) fetch a real HL coin's candles + a known whale's fills live (replace sample data), (b) render whale ghost entry/exit markers on the chart, (c) dual equity curves (you vs whale, from `simulate` / `whaleCurve`), (d) paper-trade controls (long/short/close + size + leverage). Then deploy to Netlify.
+**▶ NEXT TASK:** Deploy to Netlify — get the live URL. Free-play game is fully playable + verified (trade, ghost markers, racing equity curves, result). Deploy on sample data first to establish the Netlify site + SPA build, THEN swap sample→live HL data, THEN `/qa`. (Netlify CLI installed; site e.g. `beat-the-whale`.)
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
@@ -63,7 +63,8 @@ global leaderboard, plus unranked free-play.
 - [x] Replay engine built + compiles (`src/lib/replay.ts`): deterministic clock + paper sim + whale ghost curve
 - [x] Replay engine unit tests — 7 passing (PnL long/short, liquidation, close-realization, determinism, whale curve)
 - [x] Chart renders + deterministic replay playback (lightweight-charts) — verified live, 0 console errors
-- [ ] Wire sim → dual equity curves + ghost markers + paper-trade controls
+- [x] Free-play GAME wired + verified live: paper trade (long/short/close + size/lev), whale ghost markers, dual racing equity curves, live you-vs-whale PnL, result overlay
+- [ ] Swap sample data → live Hyperliquid data (real coin candles + a known whale's fills)
 - [ ] Chart + whale ghost markers
 - [ ] Paper execution (long/short, size, leverage, fees/slippage)
 - [ ] Dual live equity curves (you vs whale)
