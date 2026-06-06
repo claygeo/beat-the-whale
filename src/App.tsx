@@ -3,16 +3,39 @@ import { CandleChart, type WhaleMarker } from './components/CandleChart'
 import { EquityChart } from './components/EquityChart'
 import { useReplayClock } from './hooks/useReplayClock'
 import { sampleCandles, sampleGhost } from './lib/sample'
-import { simulate, whaleCurve, type OrderIntent } from './lib/replay'
+import { simulate, whaleCurve, type GhostTrade, type OrderIntent } from './lib/replay'
+import { buildChallengeFromWallet, FEATURED_WHALES, type Challenge } from './lib/challenge'
+import type { Candle } from './lib/hyperliquid'
 
 const MS_PER_TICK = 240
 const START_EQUITY = 10_000
 
+interface Active {
+  coin: string
+  label: string
+  candles: Candle[]
+  ghost: GhostTrade[]
+  startEquity: number
+}
+
 export default function App() {
-  const candles = useMemo(() => sampleCandles(120), [])
-  const ghost = useMemo(() => sampleGhost(candles), [candles])
+  const sample = useMemo<Active>(() => {
+    const candles = sampleCandles(120)
+    return { coin: 'SAMPLE', label: 'Sample whale', candles, ghost: sampleGhost(candles), startEquity: START_EQUITY }
+  }, [])
+
+  const [challenge, setChallenge] = useState<Challenge | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [address, setAddress] = useState('')
+
+  const active: Active = challenge ?? sample
+  const { candles, ghost } = active
   const tickCount = candles.length - 1
-  const whaleEq = useMemo(() => whaleCurve(ghost, START_EQUITY, tickCount), [ghost, tickCount])
+  const whaleEq = useMemo(
+    () => whaleCurve(ghost, active.startEquity, tickCount),
+    [ghost, active.startEquity, tickCount],
+  )
 
   const [running, setRunning] = useState(false)
   const [runKey, setRunKey] = useState(0)
@@ -24,8 +47,8 @@ export default function App() {
   const done = running && tick >= tickCount
 
   const playerSim = useMemo(
-    () => simulate(candles, orders, START_EQUITY, tick),
-    [candles, orders, tick],
+    () => simulate(candles, orders, active.startEquity, tick),
+    [candles, orders, active.startEquity, tick],
   )
 
   const position = useMemo(() => {
@@ -39,17 +62,42 @@ export default function App() {
     return p
   }, [orders, tick])
 
-  const youPnl = playerSim.finalEquity - START_EQUITY
-  const whalePnl = (whaleEq[Math.min(tick, tickCount)]?.equity ?? START_EQUITY) - START_EQUITY
+  const youPnl = playerSim.finalEquity - active.startEquity
+  const whalePnl = (whaleEq[Math.min(tick, tickCount)]?.equity ?? active.startEquity) - active.startEquity
 
   const place = (action: OrderIntent['action']) => {
     if (!running || done) return
     setOrders((os) => [...os, { tick, action, size, leverage }])
   }
+  const resetGame = () => {
+    setRunning(false)
+    setOrders([])
+    setRunKey((k) => k + 1)
+  }
   const start = () => {
     setOrders([])
     setRunKey((k) => k + 1)
     setRunning(true)
+  }
+
+  const loadWhale = async (addr: string, label?: string) => {
+    if (loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const c = await buildChallengeFromWallet(addr, label ? { label } : {})
+      setChallenge(c)
+      resetGame()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load wallet.')
+    } finally {
+      setLoading(false)
+    }
+  }
+  const useSample = () => {
+    setChallenge(null)
+    setError(null)
+    resetGame()
   }
 
   const markers: WhaleMarker[] = ghost
@@ -60,7 +108,6 @@ export default function App() {
       up: !!g.dir?.includes('Long'),
       text: g.dir ?? '',
     }))
-
   const whaleVisible = whaleEq.slice(0, tick + 1)
 
   return (
@@ -73,9 +120,6 @@ export default function App() {
           <span className="whitespace-nowrap font-display text-sm font-bold tracking-tight text-ink">
             Beat the Whale
           </span>
-          <span className="hidden rounded-sm border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-secondary sm:inline-block">
-            free play
-          </span>
         </div>
         <div className="flex shrink-0 items-center gap-2.5 font-mono text-[11px] tabular-nums sm:gap-4">
           <Pnl label="you" value={youPnl} className="text-racer-you" />
@@ -85,6 +129,53 @@ export default function App() {
           </span>
         </div>
       </header>
+
+      {/* whale source bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-line px-3 py-1.5">
+        <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted">
+          racing
+        </span>
+        <span className="whitespace-nowrap font-mono text-[11px] text-ink">
+          {active.label}
+          {active.coin !== 'SAMPLE' && <span className="text-ink-secondary"> · {active.coin}</span>}
+        </span>
+        <span className="mx-1 h-3 w-px shrink-0 bg-line" />
+        {FEATURED_WHALES.map((w) => (
+          <button
+            key={w.address}
+            onClick={() => loadWhale(w.address, w.label)}
+            disabled={loading}
+            className="whitespace-nowrap rounded-sm border border-line px-2 py-0.5 font-mono text-[10px] text-ink-secondary transition-colors hover:border-racer-whale/50 hover:text-ink disabled:opacity-50"
+          >
+            {w.label}
+          </button>
+        ))}
+        <input
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && loadWhale(address)}
+          placeholder="0x wallet…"
+          spellCheck={false}
+          className="w-28 shrink-0 rounded-sm border border-line bg-surface px-2 py-0.5 font-mono text-[10px] text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
+        />
+        <button
+          onClick={() => loadWhale(address)}
+          disabled={loading}
+          className="shrink-0 rounded-sm border border-primary-muted bg-primary-muted/40 px-2 py-0.5 font-mono text-[10px] uppercase text-primary transition-colors hover:bg-primary-muted/60 disabled:opacity-50"
+        >
+          race
+        </button>
+        {challenge && (
+          <button
+            onClick={useSample}
+            className="shrink-0 whitespace-nowrap rounded-sm border border-line px-2 py-0.5 font-mono text-[10px] text-ink-muted transition-colors hover:text-ink"
+          >
+            sample
+          </button>
+        )}
+        {loading && <span className="shrink-0 font-mono text-[10px] text-ink-secondary">loading…</span>}
+        {error && <span className="shrink-0 whitespace-nowrap font-mono text-[10px] text-down">{error}</span>}
+      </div>
 
       <div className="relative min-h-0 flex-1">
         <CandleChart candles={candles} visibleTick={tick} markers={markers} />
@@ -99,7 +190,7 @@ export default function App() {
         {done && <ResultOverlay youPnl={youPnl} whalePnl={whalePnl} onReplay={start} />}
       </div>
 
-      <div className="relative h-[22vh] min-h-[120px] border-t border-line">
+      <div className="relative h-[20vh] min-h-[110px] border-t border-line">
         <div className="pointer-events-none absolute left-3 top-2 z-10 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted">
           equity race
         </div>
@@ -116,33 +207,33 @@ export default function App() {
               ▶ play
             </button>
           ) : (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex flex-1 gap-2">
-              <button
-                onClick={() => place('open_long')}
-                className="flex-1 rounded-md border border-up/30 bg-up/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-up transition-colors hover:bg-up/20"
-              >
-                long
-              </button>
-              <button
-                onClick={() => place('open_short')}
-                className="flex-1 rounded-md border border-down/30 bg-down/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-down transition-colors hover:bg-down/20"
-              >
-                short
-              </button>
-              <button
-                onClick={() => place('close')}
-                className="flex-1 rounded-md border border-line py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-ink-secondary transition-colors hover:bg-surface-hover"
-              >
-                close
-              </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-1 gap-2">
+                <button
+                  onClick={() => place('open_long')}
+                  className="flex-1 rounded-md border border-up/30 bg-up/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-up transition-colors hover:bg-up/20"
+                >
+                  long
+                </button>
+                <button
+                  onClick={() => place('open_short')}
+                  className="flex-1 rounded-md border border-down/30 bg-down/10 py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-down transition-colors hover:bg-down/20"
+                >
+                  short
+                </button>
+                <button
+                  onClick={() => place('close')}
+                  className="flex-1 rounded-md border border-line py-2.5 font-mono text-xs uppercase tracking-[0.08em] text-ink-secondary transition-colors hover:bg-surface-hover"
+                >
+                  close
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-1.5 sm:justify-end">
+                <Stepper label="size" value={size} onChange={setSize} step={500} prefix="$" />
+                <Stepper label="lev" value={leverage} onChange={setLeverage} step={1} suffix="x" />
+              </div>
             </div>
-            <div className="flex items-center justify-center gap-1.5 sm:justify-end">
-              <Stepper label="size" value={size} onChange={setSize} step={500} prefix="$" />
-              <Stepper label="lev" value={leverage} onChange={setLeverage} step={1} suffix="x" />
-            </div>
-          </div>
-        )}
+          )}
         </footer>
       )}
     </main>

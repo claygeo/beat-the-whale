@@ -90,7 +90,9 @@ export async function fetchUserFillsByTime(
 ): Promise<HlFill[]> {
   const all: HlFill[] = []
   let cursor = startTime
-  for (let page = 0; page < 20; page++) {
+  // Cap pagination: very active wallets (HFT/MM) have tens of thousands of fills; we only need a
+  // representative recent slice to build a challenge, and many sequential pages would hang the UI.
+  for (let page = 0; page < 5; page++) {
     const batch = await infoRequest<HlFill[]>(
       { type: 'userFillsByTime', user, startTime: cursor, endTime },
       signal,
