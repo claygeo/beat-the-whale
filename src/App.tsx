@@ -571,11 +571,12 @@ function StartHint({ mode, label, coin }: { mode: Mode; label: string; coin: str
         <span className="text-5xl">🎮</span>
         <span className="text-xl font-bold tracking-tight text-ink">Trade the chaos</span>
         <p className="max-w-[19rem] text-[13px] leading-relaxed text-ink-secondary">
-          A live synthetic market. Go long or short and beat the{' '}
-          <span className="font-semibold text-racer-whale">bot&apos;s</span> PnL by the end. Slam the{' '}
+          A live synthetic market vs a momentum{' '}
+          <span className="font-semibold text-racer-whale">bot</span>. The edge: take a position{' '}
+          <span className="italic">first</span>, then slam{' '}
           <span className="font-semibold text-down">⚡ crash</span> /{' '}
-          <span className="font-semibold text-up">🚀 pump</span> buttons to swing the market — random
-          size + timing every run.
+          <span className="font-semibold text-up">🚀 pump</span> to swing the market your way — random
+          size + timing every run. Beat the bot&apos;s PnL by the end.
         </p>
         <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-bg">
           ▶ Press play to start
