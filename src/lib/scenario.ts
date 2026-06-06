@@ -123,8 +123,12 @@ function recompute(path: ScenarioPath, from: number): void {
       drift += c.drift
       vol *= c.volMul
     }
-    const ret = drift + vol * gauss(seed, i)
-    prices[i] = Math.max(0.01, prices[i - 1] * (1 + ret))
+    // hard caps so stacked / button-mashed events can never overflow to Infinity/NaN:
+    // bound volatility, then bound a single sub-tick's return to ±50%.
+    vol = Math.min(vol, 0.05)
+    const ret = Math.max(-0.5, Math.min(0.5, drift + vol * gauss(seed, i)))
+    const next = prices[i - 1] * (1 + ret)
+    prices[i] = Number.isFinite(next) ? Math.max(0.01, next) : Math.max(0.01, prices[i - 1])
   }
 }
 
@@ -135,8 +139,12 @@ export function createPath(
   lengthMs = SCENARIO_LENGTH_MS,
   drift = SCENARIO_DRIFT,
 ): ScenarioPath {
-  const n = Math.ceil(lengthMs / STREAM_DT) + 1
-  const path: ScenarioPath = { seed: seed >>> 0, price0, baseDrift: drift, baseVol: 0.0005, events: [], prices: new Array(n).fill(price0), basePrices: [] }
+  // clamp external inputs to finite, sane values so a bad arg can't produce a NaN array length / path
+  const p0 = Number.isFinite(price0) && price0 > 0 ? price0 : SCENARIO_PRICE0
+  const len = Number.isFinite(lengthMs) && lengthMs > 0 ? lengthMs : SCENARIO_LENGTH_MS
+  const dr = Number.isFinite(drift) ? drift : SCENARIO_DRIFT
+  const n = Math.ceil(len / STREAM_DT) + 1
+  const path: ScenarioPath = { seed: seed >>> 0, price0: p0, baseDrift: dr, baseVol: 0.0005, events: [], prices: new Array(n).fill(p0), basePrices: [] }
   recompute(path, 0)
   path.basePrices = path.prices.slice() // snapshot the event-free market the opponent index holds
   return path
@@ -149,7 +157,9 @@ export function createPath(
  */
 export function injectEvent(path: ScenarioPath, key: ScenarioKey, elapsedMs: number): ScenarioPath {
   const band = SCENARIOS[key]
-  const triggerIndex = Math.min(path.prices.length - 2, Math.max(0, Math.floor(elapsedMs / STREAM_DT)))
+  if (!band || path.events.length >= 20) return path // unknown key or sane cap on stacked events
+  const safeElapsed = Number.isFinite(elapsedMs) ? elapsedMs : 0
+  const triggerIndex = Math.min(path.prices.length - 2, Math.max(0, Math.floor(safeElapsed / STREAM_DT)))
   const k = path.events.length + 1
   const magnitude = band.dir * (band.magMin + uniform(path.seed, triggerIndex, 10 + k) * (band.magMax - band.magMin))
   const durMs = band.durMinMs + uniform(path.seed, triggerIndex, 30 + k) * (band.durMaxMs - band.durMinMs)
@@ -161,13 +171,15 @@ export function injectEvent(path: ScenarioPath, key: ScenarioKey, elapsedMs: num
 
 /** Pure sample of the path by elapsed wall-clock (clamped). Independent of call order/frequency. */
 export function priceAtElapsed(path: ScenarioPath, elapsedMs: number): number {
-  const i = Math.min(path.prices.length - 1, Math.max(0, Math.floor(elapsedMs / STREAM_DT)))
+  const e = Number.isFinite(elapsedMs) ? elapsedMs : 0
+  const i = Math.min(path.prices.length - 1, Math.max(0, Math.floor(e / STREAM_DT)))
   return path.prices[i]
 }
 
 /** Sub-tick index at elapsed wall-clock — the scenario equivalent of a replay tick. */
 export function streamTickAtElapsed(path: ScenarioPath, elapsedMs: number): number {
-  return Math.min(path.prices.length - 1, Math.max(0, Math.floor(elapsedMs / STREAM_DT)))
+  const e = Number.isFinite(elapsedMs) ? elapsedMs : 0
+  return Math.min(path.prices.length - 1, Math.max(0, Math.floor(e / STREAM_DT)))
 }
 
 /**

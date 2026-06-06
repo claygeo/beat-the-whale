@@ -138,3 +138,24 @@ describe('index opponent (passive market)', () => {
     expect(curve.length).toBeGreaterThan(50)
   })
 })
+
+describe('robustness / hardening (codex pre-landing review)', () => {
+  it('survives many button-mashed overlapping events without NaN/Infinity/negative price', () => {
+    const p = createPath(5)
+    for (let t = 0; t < 40; t++) injectEvent(p, t % 2 ? 'fast_pump' : 'flash_crash', t * 1000)
+    for (const px of p.prices) {
+      expect(Number.isFinite(px)).toBe(true)
+      expect(px).toBeGreaterThan(0)
+    }
+    expect(p.events.length).toBeLessThanOrEqual(20) // stacked-event cap holds
+  })
+
+  it('clamps non-finite inputs instead of propagating NaN', () => {
+    const p = createPath(NaN, NaN, NaN, NaN)
+    expect(p.prices.length).toBeGreaterThan(50)
+    expect(Number.isFinite(p.prices[0])).toBe(true)
+    expect(Number.isFinite(priceAtElapsed(p, NaN))).toBe(true)
+    expect(Number.isFinite(priceAtElapsed(p, Infinity))).toBe(true)
+    expect(() => injectEvent(p, 'flash_crash', NaN)).not.toThrow()
+  })
+})
