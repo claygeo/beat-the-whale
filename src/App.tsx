@@ -5,6 +5,7 @@ import { useReplayClock } from './hooks/useReplayClock'
 import { sampleCandles, sampleGhost } from './lib/sample'
 import { simulate, whaleCurve, type GhostTrade, type OrderIntent } from './lib/replay'
 import { buildChallengeFromWallet, FEATURED_WHALES, type Challenge } from './lib/challenge'
+import { loadDailyChallenge } from './lib/ranked'
 import type { Candle } from './lib/hyperliquid'
 
 const TARGET_REPLAY_MS = 60_000
@@ -28,6 +29,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [address, setAddress] = useState('')
+  const [rankedId, setRankedId] = useState<string | null>(null)
 
   const active: Active = challenge ?? sample
   const { candles, ghost } = active
@@ -91,6 +93,7 @@ export default function App() {
     try {
       const c = await buildChallengeFromWallet(addr, label ? { label } : {})
       setChallenge(c)
+      setRankedId(null)
       resetGame()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load wallet.')
@@ -98,8 +101,28 @@ export default function App() {
       setLoading(false)
     }
   }
+  const loadDaily = async () => {
+    if (loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const d = await loadDailyChallenge()
+      if (!d) {
+        setError('No daily challenge yet — check back soon.')
+        return
+      }
+      setChallenge(d)
+      setRankedId(d.challengeId)
+      resetGame()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load daily challenge.')
+    } finally {
+      setLoading(false)
+    }
+  }
   const useSample = () => {
     setChallenge(null)
+    setRankedId(null)
     setError(null)
     resetGame()
   }
@@ -137,13 +160,20 @@ export default function App() {
       {/* whale source bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto border-b border-line px-3 py-1.5">
         <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted">
-          racing
+          {rankedId ? '🏆 ranked' : 'racing'}
         </span>
         <span className="whitespace-nowrap font-mono text-[11px] text-ink">
           {active.label}
           {active.coin !== 'SAMPLE' && <span className="text-ink-secondary"> · {active.coin}</span>}
         </span>
         <span className="mx-1 h-3 w-px shrink-0 bg-line" />
+        <button
+          onClick={loadDaily}
+          disabled={loading}
+          className="shrink-0 whitespace-nowrap rounded-sm border border-warn/40 bg-warn/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.05em] text-warn transition-colors hover:bg-warn/20 disabled:opacity-50"
+        >
+          🏆 daily
+        </button>
         {FEATURED_WHALES.map((w) => (
           <button
             key={w.address}
