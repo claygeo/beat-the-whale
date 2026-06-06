@@ -9,7 +9,9 @@
 
 **Iteration protocol:** (1) read this file → (2) do the **NEXT TASK** → (3) verify (build / test / preview) → (4) commit + push — ALWAYS strip the auto-injected `geobridge` dep from package.json first (atomic strip+commit) → (5) check off the task + set a new NEXT TASK → (6) continue.
 
-**▶ NEXT TASK:** **RANKED MODE** (the daily Wordle-style challenge). Steps: (1) a freeze job picks a curated race + snapshots candles + whale trades into Supabase (tables exist) as the day's `challenge`, status='live'; (2) Netlify function `submit-attempt` (service-role, server-authoritative: order intents → replay tick → recompute PnL from frozen data); (3) leaderboard UI via `get_leaderboard` RPC + `get_active_challenge`. Codex the freeze-job + scoring details first (schema-adjacent). ALSO quick: verify the whale-source bar's paste input is reachable on mobile (375px) with 2 featured races.
+**Ranked architecture (codex-locked):** NO service-role key. (1) in-DB scoring via SECURITY DEFINER RPC (Postgres = authority); (2) ship-all-candles + UI-hide + one-shot/device (casual free leaderboard, not prize-grade); (3) pg_cron / manual-MCP freeze job. `submit_ranked_attempt` v1 applied (0002) — trusts client PnL within a bound + stores orders for audit.
+
+**▶ NEXT TASK (ranked, cont'd):** (1) **Seed the BTC swing race as today's `challenge`** (status='live') — frozen `challenge_candles` + `challenge_whale_trades` (build via challenge.ts logic; insert via MCP); verify `get_active_challenge` returns it + `rpc()` client reads it. (2) **Frontend ranked flow**: a "Daily Challenge" entry → load active challenge → one-shot play → `submit_ranked_attempt` → leaderboard via `get_leaderboard` (+ a device-hash + handle prompt). (3) Then **full in-DB PnL recompute** in `submit_ranked_attempt` (replace trust-client, golden-test vs TS `simulate()`) + pg_cron daily freeze. (Also still pending: whale-bar mobile paste visibility.)
 
 **Build order:** engine tests → free-play game UI (chart + ghost + dual equity curves + paper controls) → deploy Netlify → `/qa` + `/qa-design-review` (mobile / desktop / X-webview) → ranked (daily freeze + scoring fns + leaderboard) → share card → endless `/qa` loop.
 
@@ -69,7 +71,7 @@ global leaderboard, plus unranked free-play.
 - [ ] Paper execution (long/short, size, leverage, fees/slippage)
 - [ ] Dual live equity curves (you vs whale)
 - [ ] Daily challenge generator (freeze whale+window into Supabase)
-- [ ] Server-side ranked scoring + validation
+- [~] Server-side ranked scoring — `submit_ranked_attempt` v1 applied (records attempt + orders, one-per-device, sanity bound); full in-DB PnL recompute vs TS engine = next
 - [ ] Leaderboard
 - [ ] Share card (server-rendered OG image)
 - [ ] Free-play mode (pick any whale)
