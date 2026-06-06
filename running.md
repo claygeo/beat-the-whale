@@ -80,6 +80,7 @@ global leaderboard, plus unranked free-play.
 - [x] Mobile (375px) QA: header nowrap + badge hidden, trade controls stack on narrow — verified live
 - [x] **Webview replay-freeze FIXED**: rAF is paused in backgrounded / in-app webviews → added a `setInterval` fallback that drives the wall-clock tick (verified the replay advances in a backgrounded preview). This was the #1 webview risk codex flagged.
 - [x] Result UX: consolidated to a single CTA (footer hidden behind the result overlay)
+- [x] Cold-start polish: branded "press play" hint overlay explains the game (was a lonely 1-candle chart); also fixed a latent `vite-env.d.ts` (import.meta.env types)
 - [ ] Desktop/tablet layout re-verify + iOS Safari safe-area + real X in-app webview device test
 
 ### Phase 5 — QA + review
