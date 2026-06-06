@@ -7,7 +7,7 @@ import { simulate, whaleCurve, type GhostTrade, type OrderIntent } from './lib/r
 import { buildChallengeFromWallet, FEATURED_WHALES, type Challenge } from './lib/challenge'
 import type { Candle } from './lib/hyperliquid'
 
-const MS_PER_TICK = 240
+const TARGET_REPLAY_MS = 60_000
 const START_EQUITY = 10_000
 
 interface Active {
@@ -43,7 +43,11 @@ export default function App() {
   const [size, setSize] = useState(2000)
   const [leverage, setLeverage] = useState(5)
 
-  const tick = useReplayClock({ running, msPerTick: MS_PER_TICK, tickCount, runKey })
+  const msPerTick = useMemo(
+    () => Math.min(350, Math.max(60, Math.round(TARGET_REPLAY_MS / Math.max(1, tickCount)))),
+    [tickCount],
+  )
+  const tick = useReplayClock({ running, msPerTick, tickCount, runKey })
   const done = running && tick >= tickCount
 
   const playerSim = useMemo(
@@ -179,6 +183,7 @@ export default function App() {
 
       <div className="relative min-h-0 flex-1">
         <CandleChart candles={candles} visibleTick={tick} markers={markers} />
+        {loading && <LoadingOverlay />}
         {position && (
           <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-line bg-surface/80 px-2 py-1 font-mono text-[11px] tabular-nums backdrop-blur-sm">
             <span className={position.side === 'long' ? 'text-up' : 'text-down'}>
@@ -289,6 +294,19 @@ function Stepper({
       >
         +
       </button>
+    </div>
+  )
+}
+
+function LoadingOverlay() {
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg/80 backdrop-blur-sm">
+      <span className="animate-pulse text-3xl" role="img" aria-label="whale">
+        🐋
+      </span>
+      <span className="font-mono text-xs uppercase tracking-[0.1em] text-ink-secondary">
+        loading the whale&apos;s trades…
+      </span>
     </div>
   )
 }

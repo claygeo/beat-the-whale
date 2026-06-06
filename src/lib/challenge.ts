@@ -33,11 +33,15 @@ function tickForTime(candles: Candle[], t: number): number {
   return idx
 }
 
-/** Featured whales (top recent leaderboard performers with live activity). */
+/**
+ * Curated "good races" — swing traders with discrete directional bets, not HFT/MMs.
+ * Sourced via codex's filter (decent roi, low volume/pnl ratio) then scored on real fills
+ * (3-40 fills, real closes, meaningful realized PnL on the dominant coin).
+ *   0x3202… → 22 BTC fills, ~$32k realized PnL.   0x9426… → WLD run, ~$9k.
+ */
 export const FEATURED_WHALES: { address: string; label: string }[] = [
-  { address: '0x0ddf9bae2af4b874b96d287a5ad42eb47138a902', label: 'Top weekly whale' },
-  { address: '0x7fdafde5cfb5465924316eced2d3715494c517d1', label: 'Whale #2' },
-  { address: '0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36', label: 'Whale #3' },
+  { address: '0x32021857b782a42e67bdc218e3d77c7e91f08320', label: 'BTC swing' },
+  { address: '0x942683e14c62862bc6c2ba28539cfe66fdc61b2e', label: 'WLD run' },
 ]
 
 export function isValidAddress(a: string): boolean {
@@ -62,7 +66,6 @@ export async function buildChallengeFromWallet(
 
   const now = Date.now()
   const lookback = (opts.lookbackDays ?? 10) * DAY
-  const interval: CandleInterval = opts.interval ?? '5m'
 
   const fills = await fetchUserFillsByTime(addr, now - lookback, now)
   if (fills.length === 0) throw new Error('This wallet has no trades in the last 10 days to race.')
@@ -81,6 +84,10 @@ export async function buildChallengeFromWallet(
   const windowStart = coinFills[0].time - pad
   const windowEnd = Math.min(now, coinFills[coinFills.length - 1].time + pad)
 
+  // adaptive granularity so the replay stays a sane length regardless of how long the whale held
+  const windowMs = windowEnd - windowStart
+  const interval: CandleInterval =
+    opts.interval ?? (windowMs > 4 * DAY ? '1h' : windowMs > 18 * 60 * 60 * 1000 ? '15m' : '5m')
   const candles = await fetchCandles(coin, interval, windowStart, windowEnd)
   if (candles.length < 10) throw new Error('Not enough price history for this window — try another wallet.')
 
