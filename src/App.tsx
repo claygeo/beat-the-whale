@@ -5,7 +5,13 @@ import { useReplayClock } from './hooks/useReplayClock'
 import { sampleCandles, sampleGhost } from './lib/sample'
 import { simulate, whaleCurve, type GhostTrade, type OrderIntent } from './lib/replay'
 import { buildChallengeFromWallet, FEATURED_WHALES, type Challenge } from './lib/challenge'
-import { loadDailyChallenge } from './lib/ranked'
+import {
+  loadDailyChallenge,
+  submitRankedAttempt,
+  getLeaderboard,
+  type SubmitResult,
+  type LeaderboardRow,
+} from './lib/ranked'
 import type { Candle } from './lib/hyperliquid'
 
 const TARGET_REPLAY_MS = 60_000
@@ -223,7 +229,17 @@ export default function App() {
             <span className="text-ink-secondary">${position.size.toLocaleString()}</span>
           </div>
         )}
-        {done && <ResultOverlay youPnl={youPnl} whalePnl={whalePnl} onReplay={start} />}
+        {done &&
+          (rankedId ? (
+            <RankedResult
+              challengeId={rankedId}
+              youPnl={youPnl}
+              whalePnl={whalePnl}
+              orders={orders}
+            />
+          ) : (
+            <ResultOverlay youPnl={youPnl} whalePnl={whalePnl} onReplay={start} />
+          ))}
       </div>
 
       <div className="relative h-[20vh] min-h-[110px] border-t border-line">
@@ -353,6 +369,126 @@ function LoadingOverlay() {
       <span className="font-mono text-xs uppercase tracking-[0.1em] text-ink-secondary">
         loading the whale&apos;s trades…
       </span>
+    </div>
+  )
+}
+
+function RankedResult({
+  challengeId,
+  youPnl,
+  whalePnl,
+  orders,
+}: {
+  challengeId: string
+  youPnl: number
+  whalePnl: number
+  orders: OrderIntent[]
+}) {
+  const beat = youPnl > whalePnl
+  const diff = youPnl - whalePnl
+  const [handle, setHandle] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [result, setResult] = useState<SubmitResult | null>(null)
+  const [board, setBoard] = useState<LeaderboardRow[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    const h = handle.trim()
+    if (submitting || h.length < 1) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const r = await submitRankedAttempt({
+        challengeId,
+        handle: h,
+        finalPnl: youPnl,
+        beatWhale: beat,
+        orders,
+      })
+      setResult(r)
+      setBoard(await getLeaderboard(challengeId))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg.includes('already_played')) {
+        setError('You already played today.')
+        setBoard(await getLeaderboard(challengeId).catch(() => null))
+      } else {
+        setError('Could not submit — try again.')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-bg/90 px-6 py-6 text-center backdrop-blur-sm">
+      <span className="font-display text-xl font-bold tracking-tight text-ink">
+        {beat ? 'You beat the whale 🎉' : 'The whale won 🐋'}
+      </span>
+      <span className={`font-mono text-sm tabular-nums ${beat ? 'text-up' : 'text-down'}`}>
+        {beat ? '+' : '−'}${Math.abs(diff).toFixed(0)} vs the whale
+      </span>
+
+      {board ? (
+        <div className="w-full max-w-sm">
+          {result && (
+            <div className="mb-2 font-mono text-xs uppercase tracking-[0.1em] text-primary">
+              you ranked #{result.leaderboard_rank}
+            </div>
+          )}
+          <div className="rounded-md border border-line text-left">
+            <div className="flex items-center justify-between border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted">
+              <span>today&apos;s leaderboard</span>
+              <span>pnl</span>
+            </div>
+            <div className="max-h-52 overflow-y-auto">
+              {board.length === 0 ? (
+                <div className="px-3 py-2 font-mono text-[11px] text-ink-muted">
+                  be the first to post a score
+                </div>
+              ) : (
+                board.map((row) => (
+                  <div
+                    key={`${row.leaderboard_rank}-${row.handle}`}
+                    className="flex items-center justify-between px-3 py-1.5 font-mono text-[11px] tabular-nums"
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <span className="w-5 shrink-0 text-right text-ink-muted">
+                        {row.leaderboard_rank}
+                      </span>
+                      <span className="truncate text-ink">{row.handle}</span>
+                      {row.beat_whale && <span className="text-[9px]">🐋</span>}
+                    </span>
+                    <span className={row.final_pnl >= 0 ? 'text-up' : 'text-down'}>
+                      {row.final_pnl >= 0 ? '+' : '−'}${Math.abs(row.final_pnl).toFixed(0)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          {error && <span className="mt-2 block font-mono text-[11px] text-warn">{error}</span>}
+        </div>
+      ) : (
+        <div className="flex w-full max-w-xs flex-col items-center gap-2">
+          <input
+            value={handle}
+            onChange={(e) => setHandle(e.target.value.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 24))}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            placeholder="your handle"
+            spellCheck={false}
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-center font-mono text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
+          />
+          <button
+            onClick={submit}
+            disabled={submitting || handle.trim().length < 1}
+            className="w-full rounded-md border border-primary-muted bg-primary-muted/40 py-2 font-mono text-xs uppercase tracking-[0.1em] text-primary transition-colors hover:bg-primary-muted/60 disabled:opacity-40"
+          >
+            {submitting ? 'submitting…' : 'submit score'}
+          </button>
+          {error && <span className="font-mono text-[11px] text-down">{error}</span>}
+        </div>
+      )}
     </div>
   )
 }
